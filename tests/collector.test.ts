@@ -30,6 +30,21 @@ describe('normalizeDisks pseudo filesystems', () => {
   })
 })
 
+describe('normalizeDisks removable and container mounts', () => {
+  it('keeps removable disks mounted under /run/media', () => {
+    const out = normalizeDisks([fs('/dev/sdb1', '/run/media/luis/USB', 100, 10)])
+    expect(out).toEqual([{ mount: '/run/media/luis/USB', used: 10, total: 100 }])
+  })
+  it('drops overlay and other virtual filesystems by device name', () => {
+    const out = normalizeDisks([
+      fs('overlay', '/var/lib/docker/overlay2/abc/merged', 100, 10),
+      fs('nsfs', '/run/docker/netns/x', 100, 1),
+      fs('/dev/sda1', '/', 100, 40)
+    ])
+    expect(out).toEqual([{ mount: '/', used: 40, total: 100 }])
+  })
+})
+
 describe('toMetrics', () => {
   it('maps values and rounds cpu to 1 decimal', () => {
     const m = toMetrics({ currentLoad: 12.345 }, { total: 1000, available: 400 }, [fs('/dev/sda1', '/', 100, 40)])

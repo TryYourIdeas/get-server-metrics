@@ -15,7 +15,8 @@ const gb = (b: number) => (b / 1024 ** 3).toFixed(1) + ' GB'
 const pct = (u: number, t: number) => (t ? (u / t) * 100 : 0)
 const cpuPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, value: p.cpuPercent })))
 const memPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, value: pct(p.memUsed, p.memTotal) })))
-const diskPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, value: pct(p.disks[0]?.used ?? 0, p.disks[0]?.total ?? 0) })))
+const chartMount = computed(() => current.value?.disks[0]?.mount)
+const diskPoints = computed(() => diskSeries(history.value ?? [], chartMount.value))
 </script>
 
 <template>
@@ -34,7 +35,7 @@ const diskPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, va
       </div>
       <UsageChart title="CPU %" :points="cpuPoints" />
       <UsageChart title="Memory %" :points="memPoints" />
-      <UsageChart :title="`Disk % (${current?.disks[0]?.mount ?? 'first disk'})`" :points="diskPoints" />
+      <UsageChart :title="`Disk % (${chartMount ?? 'first disk'})`" :points="diskPoints" />
     </section>
   </main>
 </template>
