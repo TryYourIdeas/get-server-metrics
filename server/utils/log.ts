@@ -4,4 +4,4 @@ const fmt = (level: string, msg: string, ctx?: Record<string, unknown>) =>
 
 export const logInfo = (msg: string, ctx?: Record<string, unknown>) => console.log(fmt('INFO', msg, ctx))
 export const logError = (msg: string, ctx?: Record<string, unknown>) => console.error(fmt('ERROR', msg, ctx))
-export const logDebug = (msg: string, ctx?: Record<string, unknown>) => { if (debugOn()) console.debug(fmt('DEBUG', msg, ctx)) }
+export const logDebug = (msg: string, ctx?: Record<string, unknown>) => { if (debugOn()) console.log(fmt('DEBUG', msg, ctx)) }
