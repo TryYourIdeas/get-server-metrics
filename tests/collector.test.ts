@@ -19,6 +19,17 @@ describe('normalizeDisks', () => {
   })
 })
 
+describe('normalizeDisks pseudo filesystems', () => {
+  it('drops kernel/pseudo mounts like efivars', () => {
+    const out = normalizeDisks([
+      fs('efivarfs', '/sys/firmware/efi/efivars', 448512, 319488),
+      fs('tmpfs', '/run/user/1000', 100, 1),
+      fs('/dev/sda1', '/', 100, 40)
+    ])
+    expect(out).toEqual([{ mount: '/', used: 40, total: 100 }])
+  })
+})
+
 describe('toMetrics', () => {
   it('maps values and rounds cpu to 1 decimal', () => {
     const m = toMetrics({ currentLoad: 12.345 }, { total: 1000, available: 400 }, [fs('/dev/sda1', '/', 100, 40)])
