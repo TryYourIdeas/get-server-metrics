@@ -13,8 +13,18 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "drizzle-orm": "^0.45.3",
     "nuxt": "^4.5.2",
+    "pg": "^8.23.0",
+    "systeminformation": "^5.33.14",
+    "tailwindcss": "^4.3.3",
     "vue": "^3.5.43",
     "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
+    "vitest": "^5.0.2"
   }
 }
