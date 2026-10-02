@@ -12,7 +12,7 @@
 1. The top panel shows live CPU, memory and one gauge per disk. Colours turn amber at 70% and red at 90%.
 2. Use the **1h / 24h / 7d** buttons to change the history charts.
 3. Charts show "Not enough data yet" until at least two samples exist in the selected range (the dashboard has to stay running to collect them).
-4. Values refresh automatically every minute.
+4. Gauges and charts update automatically every 5 seconds (live points are kept in the browser only; the stored history re-syncs every minute).
 
 ## Querying the stored data
 
@@ -67,7 +67,10 @@ sequenceDiagram
   B->>API: GET /api/metrics/history?range=1h
   API->>DB: select samples + disks since range start
   DB-->>B: history points
+  loop every 5 s
+    B->>API: GET /api/metrics/current (appended to charts)
+  end
   loop every 60 s
-    B->>API: refresh both
+    B->>API: refresh history (re-sync with stored samples)
   end
 ```

@@ -7,16 +7,35 @@ const range = ref<'1h' | '24h' | '7d'>('1h')
 const { data: current, error: currentError, refresh: refreshCurrent } = await useFetch<Current>('/api/metrics/current')
 const { data: history, refresh: refreshHistory } = await useFetch<Point[]>('/api/metrics/history', { query: { range } })
 
-let timer: ReturnType<typeof setInterval> | undefined
-onMounted(() => { timer = setInterval(() => { refreshCurrent(); refreshHistory() }, 60_000) })
-onBeforeUnmount(() => clearInterval(timer))
+const LIVE_INTERVAL_MS = 5_000
+const HISTORY_INTERVAL_MS = 60_000
+const MAX_LIVE_POINTS = 720 // 1h of 5s samples
 
-const gb = (b: number) => (b / 1024 ** 3).toFixed(1) + ' GB'
+const live = ref<Point[]>([])
+// A new range starts from stored history again; the in-memory live points belong to the old view.
+watch(range, () => { live.value = [] })
+watch(current, (c) => { if (c) live.value = appendLive(live.value, c, MAX_LIVE_POINTS) })
+
+let liveTimer: ReturnType<typeof setInterval> | undefined
+let historyTimer: ReturnType<typeof setInterval> | undefined
+let polling = false
+onMounted(() => {
+  liveTimer = setInterval(async () => {
+    if (polling) return // previous request still in flight
+    polling = true
+    try { await refreshCurrent() } finally { polling = false }
+  }, LIVE_INTERVAL_MS)
+  historyTimer = setInterval(refreshHistory, HISTORY_INTERVAL_MS)
+})
+onBeforeUnmount(() => { clearInterval(liveTimer); clearInterval(historyTimer) })
+
+const gb = formatBytes
 const pct = (u: number, t: number) => (t ? (u / t) * 100 : 0)
-const cpuPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, value: p.cpuPercent })))
-const memPoints = computed(() => (history.value ?? []).map(p => ({ ts: p.ts, value: pct(p.memUsed, p.memTotal) })))
+const points = computed(() => withLive(history.value ?? [], live.value))
+const cpuPoints = computed(() => points.value.map(p => ({ ts: p.ts, value: p.cpuPercent })))
+const memPoints = computed(() => points.value.map(p => ({ ts: p.ts, value: pct(p.memUsed, p.memTotal) })))
 const chartMount = computed(() => current.value?.disks[0]?.mount)
-const diskPoints = computed(() => diskSeries(history.value ?? [], chartMount.value))
+const diskPoints = computed(() => diskSeries(points.value, chartMount.value))
 </script>
 
 <template>
@@ -33,9 +52,9 @@ const diskPoints = computed(() => diskSeries(history.value ?? [], chartMount.val
       <div class="flex gap-2">
         <button v-for="r in (['1h', '24h', '7d'] as const)" :key="r" class="rounded px-3 py-1 text-sm" :class="range === r ? 'bg-sky-600 text-white' : 'bg-slate-200'" @click="range = r">{{ r }}</button>
       </div>
-      <UsageChart title="CPU %" :points="cpuPoints" />
-      <UsageChart title="Memory %" :points="memPoints" />
-      <UsageChart :title="`Disk % (${chartMount ?? 'first disk'})`" :points="diskPoints" />
+      <UsageChart title="CPU" :points="cpuPoints" />
+      <UsageChart title="Memory" :points="memPoints" :total="current?.memTotal" />
+      <UsageChart :title="`Disk (${chartMount ?? 'first disk'})`" :points="diskPoints" :total="current?.disks[0]?.total" />
     </section>
   </main>
 </template>
