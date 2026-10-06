@@ -35,6 +35,6 @@ const latest = computed(() => {
         <path :d="path" fill="none" stroke="currentColor" stroke-width="2" class="text-sky-600" vector-effect="non-scaling-stroke" />
       </svg>
     </div>
-    <p v-else class="py-8 text-center text-sm text-slate-500">Not enough data yet — samples are taken every minute.</p>
+    <p v-else class="py-8 text-center text-sm text-slate-500">Not enough data yet — a reading arrives every few minutes, or click Check now.</p>
   </div>
 </template>
