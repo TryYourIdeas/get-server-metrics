@@ -1,0 +1,12 @@
+# The app reads everything and may publish "check now" requests.
+user app
+topic read computer-usage/#
+topic write computer-usage/+/check
+
+# Every other user is an agent whose username is its HOST_ID: it may publish only its own heartbeat,
+# event, reading and status topics, and read only its own check topic.
+pattern write computer-usage/%u/heartbeat
+pattern write computer-usage/%u/event
+pattern write computer-usage/%u/reading
+pattern write computer-usage/%u/status
+pattern read computer-usage/%u/check

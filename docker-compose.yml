@@ -12,5 +12,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: computer-usage-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./docker/mosquitto/acl:/mosquitto/config/acl:ro
+      - ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro
+      - mqttdata:/mosquitto/data
 volumes:
   pgdata:
+  mqttdata:
