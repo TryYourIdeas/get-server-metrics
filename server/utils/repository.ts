@@ -1,4 +1,4 @@
-import { asc, eq, gte } from 'drizzle-orm'
+import { asc, eq, gte, lt } from 'drizzle-orm'
 import type { Db } from '../db'
 import { diskSamples, samples } from '../db/schema'
 import type { DiskMetric, Metrics } from './collector'
@@ -20,6 +20,13 @@ export function createRepository(db: Db) {
         logDebug('sample saved', { id: row!.id, disks: m.disks.length })
         return row!.id
       })
+    },
+
+    /** Deletes samples older than `cutoff` (their disk rows cascade) and returns how many samples were removed. */
+    async pruneOlderThan(cutoff: Date): Promise<number> {
+      const deleted = await db.delete(samples).where(lt(samples.ts, cutoff)).returning({ id: samples.id })
+      logDebug('samples pruned', { cutoff: cutoff.toISOString(), deleted: deleted.length })
+      return deleted.length
     },
 
     async getHistory(range: HistoryRange, now: Date = new Date()): Promise<HistoryPoint[]> {

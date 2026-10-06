@@ -7,6 +7,7 @@ Copy `.env.example` to `.env` and adjust if needed. Nuxt loads `.env` automatica
 | `DATABASE_URL` | `postgres://postgres:postgres@localhost:5433/computer-usage` | Postgres connection string for the app. |
 | `TEST_DATABASE_URL` | `postgres://postgres:postgres@localhost:5433/computer-usage-test` | Database used by `npm test`. Never point it at real data: the repository tests truncate `samples`. |
 | `SAMPLE_INTERVAL_MS` | `60000` | Milliseconds between samples. |
+| `RETENTION_DAYS` | `30` | Samples older than this many days are deleted (daily, and once at startup). `0` disables pruning. Invalid values fall back to 30. |
 | `NUXT_ADD_DEBUG_LOGS` | `false` | `true`/`1` enables tracing logs (collected metrics, saved samples, skipped ticks, served history). Errors are always logged. |
 
 ## Database (Docker)

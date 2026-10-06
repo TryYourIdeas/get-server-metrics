@@ -37,4 +37,13 @@ describe('repository', () => {
     await repo.saveSample({ ...m(1), disks: [] }, new Date())
     expect((await repo.getHistory('1h'))[0].disks).toEqual([])
   })
+  it('prunes samples older than the cutoff and cascades to their disks', async () => {
+    await repo.saveSample(m(1), new Date('2026-01-01T00:00:00Z'))
+    await repo.saveSample(m(2), new Date('2026-01-20T00:00:00Z'))
+    expect(await repo.pruneOlderThan(new Date('2026-01-10T00:00:00Z'))).toBe(1)
+    const h = await repo.getHistory('7d', new Date('2026-01-21T00:00:00Z'))
+    expect(h.map(p => p.cpuPercent)).toEqual([2])
+    const left = await db.execute(sql`select count(*)::int as n from disk_samples`)
+    expect(left.rows[0]).toEqual({ n: 2 })
+  })
 })

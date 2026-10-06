@@ -1,10 +1,5 @@
 # Pending tasks
 
-## 1. Data retention / pruning
-- **Description:** Delete or aggregate samples older than a configurable age.
-- **Value:** Keeps the database size bounded.
-- **Consequence of not doing it:** `samples` grows ~1,440 rows/day plus disk rows; disk use and the 7d query slowly increase without limit.
-
 ## 2. Downsampling for the 7d chart
 - **Description:** Return bucketed averages instead of every raw sample for long ranges.
 - **Value:** Smaller responses and faster charts.
