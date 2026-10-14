@@ -92,6 +92,16 @@ export function createRepository(db: Db) {
       }))
     },
 
+    async deleteHostLogs(hostId: string): Promise<{ samples: number; events: number }> {
+      return db.transaction(async tx => {
+        const deletedSamples = await tx.delete(samples).where(eq(samples.hostId, hostId)).returning({ id: samples.id })
+        const deletedEvents = await tx.delete(events).where(eq(events.hostId, hostId)).returning({ id: events.id })
+        const deleted = { samples: deletedSamples.length, events: deletedEvents.length }
+        logDebug('host logs deleted', { hostId, ...deleted })
+        return deleted
+      })
+    },
+
     /** Deletes samples older than `cutoff` (their disk rows cascade) and returns how many samples were removed. */
     async pruneOlderThan(cutoff: Date): Promise<number> {
       const deleted = await db.delete(samples).where(lt(samples.ts, cutoff)).returning({ id: samples.id })

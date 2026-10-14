@@ -59,6 +59,14 @@ describe('samples', () => {
     await repo.saveSample('h1', r(2, '2026-01-01T11:00:00Z'))
     expect((await repo.getLatest('h1'))?.cpuPercent).toBe(2)
   })
+  it('deletes samples and their disks only for the selected host', async () => {
+    await repo.saveSample('h1', r(1, '2026-01-01T10:00:00Z'))
+    await repo.saveSample('h2', r(2, '2026-01-01T10:00:00Z'))
+    expect(await repo.deleteHostLogs('h1')).toEqual({ samples: 1, events: 0 })
+    expect(await repo.getHistory('h1', '7d', new Date('2026-01-02T00:00:00Z'))).toEqual([])
+    expect((await repo.getHistory('h2', '7d', new Date('2026-01-02T00:00:00Z'))).map(p => p.cpuPercent)).toEqual([2])
+    expect((await db.execute(sql`select count(*)::int as n from disk_samples`)).rows[0]).toEqual({ n: 2 })
+  })
   it('prunes samples older than the cutoff and cascades to their disks', async () => {
     await repo.saveSample('h1', r(1, '2026-01-01T00:00:00Z'))
     await repo.saveSample('h1', r(2, '2026-01-20T00:00:00Z'))
@@ -89,6 +97,13 @@ describe('events', () => {
     expect(await repo.getRecentEvents('h1', 1)).toHaveLength(1)
     expect(await repo.pruneEventsOlderThan(new Date('2026-01-01T12:00:00Z'))).toBe(1)
     expect(await repo.getRecentEvents('h1', 10)).toHaveLength(1)
+  })
+  it('deletes events only for the selected host', async () => {
+    await repo.saveEvent('h1', e)
+    await repo.saveEvent('h2', e)
+    expect(await repo.deleteHostLogs('h1')).toEqual({ samples: 0, events: 1 })
+    expect(await repo.getRecentEvents('h1', 10)).toEqual([])
+    expect(await repo.getRecentEvents('h2', 10)).toHaveLength(1)
   })
 })
 

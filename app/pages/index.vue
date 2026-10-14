@@ -31,6 +31,8 @@ const now = ref(Date.now())
 
 const checking = ref(false)
 const checkMessage = ref('')
+const deletingLogs = ref(false)
+const logsMessage = ref('')
 let pendingRequestId: string | undefined
 let checkTimer: ReturnType<typeof setTimeout> | undefined
 let clockTimer: ReturnType<typeof setInterval> | undefined
@@ -63,6 +65,25 @@ async function checkNow() {
   } catch (err) {
     const code = (err as { statusCode?: number }).statusCode
     finishCheck(code === 429 ? 'Please wait a moment before checking again.' : code === 503 ? 'The MQTT broker is not connected.' : 'Could not send the check request.')
+  }
+}
+
+async function deleteHostLogs() {
+  if (!host.value || deletingLogs.value) return
+  const hostToDelete = host.value
+  if (!window.confirm(`Delete all stored samples and events for "${hostToDelete}"? This cannot be undone.`)) return
+
+  deletingLogs.value = true
+  logsMessage.value = ''
+  try {
+    const deleted = await $fetch<{ samples: number; events: number }>(`/api/hosts/${encodeURIComponent(hostToDelete)}/logs`, { method: 'DELETE' })
+    live.value = []
+    await Promise.all([refreshCurrent(), refreshHistory(), refreshEvents()])
+    logsMessage.value = `Deleted ${deleted.samples} samples and ${deleted.events} events for ${hostToDelete}. The machine entry was kept.`
+  } catch {
+    logsMessage.value = `Could not delete stored data for ${hostToDelete}.`
+  } finally {
+    deletingLogs.value = false
   }
 }
 
@@ -129,12 +150,16 @@ const when = (ts: string) => new Date(ts).toLocaleString()
         <button class="rounded bg-sky-600 px-3 py-1 text-sm text-white disabled:opacity-50" :disabled="!host || checking || !brokerConnected" @click="checkNow">
           {{ checking ? 'Checking…' : 'Check now' }}
         </button>
+        <button class="rounded bg-red-700 px-3 py-1 text-sm text-white disabled:opacity-50" :disabled="!host || deletingLogs" @click="deleteHostLogs">
+          {{ deletingLogs ? 'Deleting…' : 'Delete server logs' }}
+        </button>
       </div>
     </header>
 
     <p v-if="!brokerConnected" class="rounded bg-amber-50 p-3 text-amber-800">MQTT disconnected: no new data is arriving until the broker is back.</p>
     <p v-if="!streamUp" class="rounded bg-amber-50 p-3 text-amber-800">Live updates are disconnected, retrying…</p>
     <p v-if="checkMessage" class="rounded bg-slate-100 p-3 text-slate-700" role="status">{{ checkMessage }}</p>
+    <p v-if="logsMessage" class="rounded bg-slate-100 p-3 text-slate-700" role="status">{{ logsMessage }}</p>
     <div v-if="alerts.length" class="space-y-1 rounded border border-red-200 bg-red-50 p-3 text-red-800" role="alert">
       <p v-for="a in alerts" :key="a.kind + (a.mount ?? '')" class="font-medium">{{ describeAlert(a) }}</p>
     </div>

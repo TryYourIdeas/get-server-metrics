@@ -26,6 +26,7 @@
 5. **Check now** asks the selected machine for a fresh reading. It appears within a second or two. Check-now readings are shown but not stored, so the charts keep the 5-minute stored points plus the readings received since the page was opened. If the machine does not answer within 10 seconds you will see "No reply from the machine"; clicking again within 2 seconds shows "Please wait a moment".
 6. A red banner lists alerts that are still open (CPU, memory or a disk crossing its threshold). It clears when the agent reports recovery. **Recent events** lists the latest alerts and recoveries.
 7. Amber banners mean the app lost the MQTT broker, or the browser lost its live connection (it reconnects by itself and re-syncs).
+8. **Delete server logs** removes all stored samples (including disk readings) and events for the selected machine only. Confirm the prompt to proceed. Its machine entry remains, and future readings are stored as usual.
 
 ## Querying the stored data
 

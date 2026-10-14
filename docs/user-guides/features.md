@@ -9,9 +9,10 @@
 - **Multi-disk support** — one row per mount point; duplicate devices, snap/loop mounts and kernel pseudo-filesystems (`/sys`, `/proc`, `/run`, `/dev`) are ignored.
 - **Live gauges** — colour-coded (green < 70%, amber ≥ 70%, red ≥ 90%).
 - **History charts** — CPU, memory and first-disk usage over the last 1 hour, 24 hours or 7 days, with 0/50/100% gridlines (real sizes for memory and disk) and the current reading in the title.
+- **Per-machine log deletion** — delete one machine's stored samples (including disk samples) and events without affecting other machines or removing its machine entry.
 - **Data retention** — samples and events older than `RETENTION_DAYS` (default 30) are deleted once at startup and then daily. Set `0` to keep everything.
 - **Resilient transport** — QoS 1 with persistent sessions, a bounded offline queue on each agent, duplicate deliveries ignored, invalid messages logged and dropped.
 - **Per-agent broker access** — each agent has its own broker user and can only publish under its own host topic.
 - **Automatic schema migrations** on server start (existing single-machine rows become host `local`).
 - **Diagnostics** — structured error logs with context; optional tracing via `NUXT_ADD_DEBUG_LOGS`.
-- **JSON API** — `GET /api/hosts`, `GET /api/metrics/current?host=`, `GET /api/metrics/history?range=1h|24h|7d&host=`, `GET /api/events?host=`, `POST /api/hosts/:host/check`, `GET /api/stream` (SSE).
+- **JSON API** — `GET /api/hosts`, `GET /api/metrics/current?host=`, `GET /api/metrics/history?range=1h|24h|7d&host=`, `GET /api/events?host=`, `POST /api/hosts/:host/check`, `DELETE /api/hosts/:host/logs`, `GET /api/stream` (SSE).
