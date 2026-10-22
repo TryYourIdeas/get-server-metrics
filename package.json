@@ -2,9 +2,14 @@
   "name": "computer-usage",
   "type": "module",
   "private": true,
+  "workspaces": [
+    "event-monitor"
+  ],
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "monitor": "npm --workspace computer-usage-event-monitor run start",
+    "monitor:typecheck": "npm --workspace computer-usage-event-monitor run typecheck",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
@@ -17,7 +22,6 @@
     "@tailwindcss/vite": "^4.3.3",
     "computer-usage-agent": "file:../lib/computer-usage-agent",
     "drizzle-orm": "^0.45.3",
-    "mqtt": "^5.16.0",
     "nuxt": "^4.5.2",
     "pg": "^8.23.0",
     "tailwindcss": "^4.3.3",
@@ -27,6 +31,7 @@
   "devDependencies": {
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
     "vitest": "^5.0.2"
   }
 }

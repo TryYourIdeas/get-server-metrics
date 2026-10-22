@@ -1,18 +1,22 @@
 import { isValidHostId } from 'computer-usage-agent/protocol'
-import { getDb } from '../../../db'
-import { logError, logInfo } from '../../../utils/log'
-import { createRepository } from '../../../utils/repository'
+import { isValidHostId } from 'computer-usage-agent/protocol'
+import { eventMonitorHeaders, eventMonitorUrl } from '../../../utils/event-monitor'
+import { logError } from '../../../utils/log'
 
 export default defineEventHandler(async (event) => {
   const host = getRouterParam(event, 'host')
   if (!isValidHostId(host)) throw createError({ statusCode: 400, statusMessage: 'invalid host id' })
 
   try {
-    const deleted = await createRepository(getDb()).deleteHostLogs(host)
-    logInfo('host logs deleted', { host, ...deleted })
-    return deleted
+    const response = await fetch(eventMonitorUrl(`/hosts/${encodeURIComponent(host)}/logs`), {
+      method: 'DELETE',
+      headers: eventMonitorHeaders(),
+      signal: AbortSignal.timeout(5000)
+    })
+    if (!response.ok) throw new Error(`event monitor returned HTTP ${response.status}`)
+    return await response.json()
   } catch (err) {
-    logError('host logs deletion failed', { host, error: err instanceof Error ? err.message : String(err) })
-    throw createError({ statusCode: 500, statusMessage: 'Could not delete host logs' })
+    logError('event monitor log deletion failed', { host, error: err instanceof Error ? err.message : String(err) })
+    throw createError({ statusCode: 503, statusMessage: 'Could not delete host logs through the event monitor' })
   }
 })

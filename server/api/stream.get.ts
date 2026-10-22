@@ -1,21 +1,26 @@
-import { createEventStream } from 'h3'
-import { bus } from '../utils/bus'
-import { logDebug } from '../utils/log'
-import { isBrokerConnected } from '../utils/mqtt'
-
-const PING_MS = 25_000
+import { eventMonitorHeaders, eventMonitorUrl } from '../utils/event-monitor'
+import { logError } from '../utils/log'
 
 export default defineEventHandler(async (event) => {
-  const stream = createEventStream(event)
-  const unsubscribe = bus.subscribe((e) => { void stream.push(JSON.stringify(e)) })
-  const ping = setInterval(() => void stream.push(JSON.stringify({ type: 'ping' })), PING_MS)
-  stream.onClosed(async () => {
-    clearInterval(ping)
-    unsubscribe()
-    logDebug('stream closed')
-    await stream.close()
-  })
-  logDebug('stream opened')
-  void stream.push(JSON.stringify({ type: 'broker', connected: isBrokerConnected() }))
-  return stream.send()
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  event.node.res.once('close', abort)
+  try {
+    const upstream = await fetch(eventMonitorUrl('/stream'), {
+      headers: { accept: 'text/event-stream', ...eventMonitorHeaders() },
+      signal: controller.signal
+    })
+    if (!upstream.ok || !upstream.body) throw new Error(`event monitor returned HTTP ${upstream.status}`)
+    return new Response(upstream.body, {
+      headers: {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        'x-accel-buffering': 'no'
+      }
+    })
+  } catch (err) {
+    if (controller.signal.aborted) return
+    logError('event monitor stream proxy failed', { error: err instanceof Error ? err.message : String(err) })
+    throw createError({ statusCode: 503, statusMessage: 'Event monitor is unavailable' })
+  }
 })
