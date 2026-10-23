@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendLive, axisLabel, diskSeries, formatBytes, latestLabel, withLive } from '../app/utils/series'
+import { appendLive, axisLabel, diskSeries, formatBytes, latestLabel, withLive } from '../dashboard/app/utils/series'
 
 const p = (ts: string, disks: { mount: string; used: number; total: number }[]) => ({ ts, disks })
 

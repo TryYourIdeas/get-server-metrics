@@ -3,33 +3,26 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "event-monitor"
+    "agent",
+    "Event monitor",
+    "dashboard"
   ],
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "monitor": "npm --workspace computer-usage-event-monitor run start",
-    "monitor:typecheck": "npm --workspace computer-usage-event-monitor run typecheck",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
+    "build": "npm --workspace dashboard run build",
+    "dev": "npm --workspace dashboard run dev",
+    "monitor": "npm --workspace event-monitor run start",
+    "monitor:typecheck": "npm --workspace event-monitor run typecheck",
+    "agent": "npm --workspace agent run start",
+    "generate": "npm --workspace dashboard run generate",
+    "preview": "npm --workspace dashboard run preview",
+    "postinstall": "npm --workspace dashboard run prepare",
     "test": "vitest run",
     "db:up": "docker compose up -d",
-    "db:generate": "drizzle-kit generate",
-    "agent": "npm --prefix ../lib/computer-usage-agent start"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "computer-usage-agent": "file:../lib/computer-usage-agent",
-    "drizzle-orm": "^0.45.3",
-    "nuxt": "^4.5.2",
-    "pg": "^8.23.0",
-    "tailwindcss": "^4.3.3",
-    "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "db:generate": "drizzle-kit generate --config shared/drizzle.config.ts"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
+    "drizzle-orm": "^0.45.3",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
     "vitest": "^5.0.2"

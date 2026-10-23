@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { withRetry } from '../server/utils/retry'
+import { withRetry } from '../shared/server/utils/retry'
 
 describe('withRetry', () => {
   it('retries until it succeeds', async () => {

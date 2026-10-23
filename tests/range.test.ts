@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRange } from '../server/utils/range'
+import { parseRange } from '../shared/server/utils/range'
 
 describe('parseRange', () => {
   it('defaults to 1h when missing', () => expect(parseRange(undefined)).toBe('1h'))

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { memoizeUntilFailure } from '../server/utils/ready'
+import { memoizeUntilFailure } from '../shared/server/utils/ready'
 
 describe('memoizeUntilFailure', () => {
   it('runs once on success and again after a failure', async () => {

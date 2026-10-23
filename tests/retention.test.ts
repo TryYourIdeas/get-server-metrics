@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createPruner, parseRetentionDays } from '../server/utils/retention'
+import { createPruner, parseRetentionDays } from '../shared/server/utils/retention'
 
 describe('parseRetentionDays', () => {
   it('defaults to 30 when unset, empty or invalid', () => {

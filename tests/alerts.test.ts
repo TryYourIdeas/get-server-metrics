@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeAlerts, describeAlert, isStale } from '../app/utils/alerts'
+import { activeAlerts, describeAlert, isStale } from '../dashboard/app/utils/alerts'
 
 const e = (kind: 'cpu' | 'memory' | 'disk', state: 'alert' | 'ok', ts: string, mount?: string) =>
   ({ kind, state, value: 95, threshold: 90, ts, ...(mount ? { mount } : {}) })
