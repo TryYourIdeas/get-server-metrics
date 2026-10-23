@@ -5,18 +5,18 @@
 1. Create broker users: `docker/mosquitto/add-user.sh app <password>` and `docker/mosquitto/add-user.sh local <password>` (one user per machine; the username is the machine's `HOST_ID`).
 2. Start Postgres and the broker: `docker compose up -d`.
 3. Create the event-monitor env file: `cp event-monitor/.env.example event-monitor/.env`; set its database URL and MQTT app credentials.
-4. Create the viewer env file: `cp .env.example .env`; set its database URL and `EVENT_MONITOR_URL` if the monitor is not at its default address.
+4. Create the dashboard env file: `cp dashboard/.env.example dashboard/.env`; set its database URL and `EVENT_MONITOR_URL` if the monitor is not at its default address.
 5. Start the Node.js event monitor with `npm run monitor`. Its log shows the MQTT broker connection and database migrations run automatically at startup.
 6. Start the viewer in another terminal with `npm run dev`, then open http://localhost:3000.
-7. On every machine you want to monitor (including this one), start an agent:
+7. On every machine you want to monitor (including this one), start the agent:
 
    ```bash
-   cd lib/computer-usage-agent
+   cd agent
    cp .env.example .env     # set HOST_ID, MQTT_URL (the broker's address) and MQTT_PASSWORD
    npm install && npm start
    ```
 
-   From this repo you can also run `npm run agent`. The agent log shows `connected to broker`.
+   From the project root you can also run `npm run agent`. The agent log shows `connected to broker`.
 8. The first reading appears as soon as the agent connects (or after clicking **Check now**).
 
 ## Reading the dashboard
@@ -72,9 +72,10 @@ sequenceDiagram
     A->>A: check thresholds
   end
   A->>M: event (alert or ok) when state changes
-  M->>S: event
-  S->>DB: insert event
-  S-->>B: event (banner and list update)
+  M->>E: event
+  E->>DB: insert event
+  E-->>V: live event over SSE
+  V-->>B: relayed update (banner and list update)
 ```
 
 Check now:

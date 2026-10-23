@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import type { Reading } from 'computer-usage-agent/protocol'
-import { createDb } from '../server/db'
-import { runMigrations } from '../server/db/migrate'
-import { createRepository } from '../server/utils/repository'
+import type { Reading } from 'agent/protocol'
+import { createDb } from '../shared/server/db'
+import { runMigrations } from '../shared/server/db/migrate'
+import { createRepository } from '../shared/server/utils/repository'
 
 const url = process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/computer-usage-test'
 const { db, pool } = createDb(url)

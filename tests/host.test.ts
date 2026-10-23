@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveHost } from '../server/utils/host'
+import { resolveHost } from '../shared/server/utils/host'
 
 describe('resolveHost', () => {
   it('uses the requested host when valid', () => {

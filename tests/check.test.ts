@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createCheckRequester } from '../server/utils/check'
+import { createCheckRequester } from '../shared/server/utils/check'
 
 describe('createCheckRequester', () => {
   it('publishes a request with a fresh id', async () => {

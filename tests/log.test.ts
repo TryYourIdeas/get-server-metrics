@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { logDebug } from '../server/utils/log'
+import { logDebug } from '../shared/server/utils/log'
 
 afterEach(() => { vi.restoreAllMocks(); delete process.env.NUXT_ADD_DEBUG_LOGS })
 

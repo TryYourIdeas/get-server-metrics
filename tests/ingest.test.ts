@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createBus, type BusEvent } from '../server/utils/bus'
-import { createIngest } from '../server/utils/ingest'
+import { createBus, type BusEvent } from '../shared/server/utils/bus'
+import { createIngest } from '../shared/server/utils/ingest'
 
 const now = () => new Date('2026-01-01T12:00:00Z')
 const reading = { ts: '2026-01-01T11:59:00Z', cpuPercent: 10, memUsed: 5, memTotal: 10, disks: [{ mount: '/', used: 1, total: 2 }] }

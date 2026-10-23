@@ -1,5 +1,5 @@
 {
-  "name": "computer-usage-event-monitor",
+  "name": "event-monitor",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "computer-usage-agent": "file:../../lib/computer-usage-agent",
+    "agent": "file:../agent",
     "drizzle-orm": "^0.45.3",
     "mqtt": "^5.16.0",
     "pg": "^8.23.0",
