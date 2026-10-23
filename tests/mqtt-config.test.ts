@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readMqttConfig } from '../Event monitor/src/mqtt-config'
+import { readMqttConfig } from '../event-monitor/src/mqtt-config'
 import { eventMonitorHeaders, eventMonitorUrl } from '../dashboard/server/utils/event-monitor'
 
 describe('readMqttConfig', () => {

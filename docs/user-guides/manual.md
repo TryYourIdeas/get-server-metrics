@@ -4,7 +4,7 @@
 
 1. Create broker users: `docker/mosquitto/add-user.sh app <password>` and `docker/mosquitto/add-user.sh local <password>` (one user per machine; the username is the machine's `HOST_ID`).
 2. Start Postgres and the broker: `docker compose up -d`.
-3. Create the event-monitor env file: `cp 'Event monitor/.env.example' 'Event monitor/.env'`; set its database URL and MQTT app credentials.
+3. Create the event-monitor env file: `cp event-monitor/.env.example event-monitor/.env`; set its database URL and MQTT app credentials.
 4. Create the dashboard env file: `cp dashboard/.env.example dashboard/.env`; set its database URL and `EVENT_MONITOR_URL` if the monitor is not at its default address.
 5. Start the Node.js event monitor with `npm run monitor`. Its log shows the MQTT broker connection and database migrations run automatically at startup.
 6. Start the viewer in another terminal with `npm run dev`, then open http://localhost:3000.

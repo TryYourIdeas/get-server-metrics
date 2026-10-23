@@ -28,7 +28,7 @@ The agent publishes a heartbeat reading every `HEARTBEAT_INTERVAL_MS` (default 5
 
 ## Consumers
 
-The `Event monitor` and `dashboard` apps import `agent/protocol` (topics and payload validation). The protocol file has no dependencies on purpose.
+The `event-monitor` and `dashboard` apps import `agent/protocol` (topics and payload validation). The protocol file has no dependencies on purpose.
 
 ## Test
 

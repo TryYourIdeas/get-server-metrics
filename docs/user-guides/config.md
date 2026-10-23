@@ -1,6 +1,6 @@
 # Configuration
 
-Configure the viewer and event monitor independently. The Nuxt dashboard loads `dashboard/.env`; the Node.js monitor loads `Event monitor/.env` when started through its workspace script.
+Configure the viewer and event monitor independently. The Nuxt dashboard loads `dashboard/.env`; the Node.js monitor loads `event-monitor/.env` when started through its workspace script.
 
 ## Nuxt dashboard (`dashboard/.env`)
 
@@ -12,9 +12,9 @@ Configure the viewer and event monitor independently. The Nuxt dashboard loads `
 | `EVENT_MONITOR_TOKEN` | none | Optional shared bearer token; must match the event monitor when configured. Required when the monitor binds beyond loopback. |
 | `NUXT_ADD_DEBUG_LOGS` | `false` | `true`/`1` enables viewer tracing logs. Errors are always logged. |
 
-## Node.js event monitor (`Event monitor/.env`)
+## Node.js event monitor (`event-monitor/.env`)
 
-Start from `Event monitor/.env.example`.
+Start from `event-monitor/.env.example`.
 
 | Variable | Default | Description |
 |---|---|---|

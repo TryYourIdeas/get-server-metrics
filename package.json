@@ -4,7 +4,7 @@
   "private": true,
   "workspaces": [
     "agent",
-    "Event monitor",
+    "event-monitor",
     "dashboard"
   ],
   "scripts": {

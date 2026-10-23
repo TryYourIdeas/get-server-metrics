@@ -1,4 +1,4 @@
-# Event monitor
+# event-monitor
 
 Standalone Node.js service for the computer-usage system. It subscribes to agent MQTT topics, validates incoming messages, runs database migrations, stores readings and events in PostgreSQL, and applies retention. The `dashboard` app reads from PostgreSQL and uses this service for live updates, MQTT status, and check-now requests.
 
@@ -8,11 +8,11 @@ From the project root:
 
 ```bash
 npm install
-cp 'Event monitor/.env.example' 'Event monitor/.env'
+cp event-monitor/.env.example event-monitor/.env
 npm run monitor
 ```
 
-Set this app's database URL and MQTT app credentials in `Event monitor/.env`. The monitor listens on `127.0.0.1:3100` by default. Set the dashboard's `EVENT_MONITOR_URL` to that address.
+Set this app's database URL and MQTT app credentials in `event-monitor/.env`. The monitor listens on `127.0.0.1:3100` by default. Set the dashboard's `EVENT_MONITOR_URL` to that address.
 
 For a monitor on a different machine, set `EVENT_MONITOR_HOST` to a private-network address, configure the dashboard's `EVENT_MONITOR_URL`, and set the same strong `EVENT_MONITOR_TOKEN` in both apps. The monitor refuses non-loopback binding without a token.
 

@@ -7,7 +7,7 @@ System resources monitor: the `agent` app reports CPU, memory, and disk usage ov
 | Folder | App | Purpose |
 |---|---|---|
 | [`agent/`](./agent/) | `agent` | Runs on each monitored server and publishes its readings to MQTT. |
-| [`Event monitor/`](./Event%20monitor/) | `event-monitor` | Consumes MQTT messages, validates and stores data, and relays live updates. |
+| [`event-monitor/`](./event-monitor/) | `event-monitor` | Consumes MQTT messages, validates and stores data, and relays live updates. |
 | [`dashboard/`](./dashboard/) | `dashboard` | Nuxt web app that reads PostgreSQL and displays resource usage. |
 
 Shared database and ingestion utilities are in [`shared/`](./shared/); deployment files and project-wide tests remain at the repository root.
@@ -20,7 +20,7 @@ docker/mosquitto/add-user.sh local <password>     # broker user for this machine
 docker compose up -d        # Postgres 18 on localhost:5433, Mosquitto on localhost:1883
 npm install
 # configure each app
-cp 'Event monitor/.env.example' 'Event monitor/.env'
+cp event-monitor/.env.example event-monitor/.env
 cp dashboard/.env.example dashboard/.env
 npm install
 npm run monitor             # terminal 1: Node.js MQTT ingestion service
