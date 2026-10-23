@@ -5,5 +5,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
-  vite: { plugins: [tailwindcss()] }
+  vite: { plugins: [tailwindcss()] },
+  // The shared package ships TypeScript source, so it must be bundled instead of left as an external import.
+  nitro: { externals: { inline: ['computer-usage-agent'] } },
+  build: { transpile: ['computer-usage-agent'] }
 })

@@ -1,0 +1,19 @@
+{
+  "name": "computer-usage-event-monitor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx --env-file-if-exists=.env src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "computer-usage-agent": "file:../../lib/computer-usage-agent",
+    "drizzle-orm": "^0.45.3",
+    "mqtt": "^5.16.0",
+    "pg": "^8.23.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

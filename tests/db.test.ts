@@ -8,10 +8,10 @@ const { db, pool } = createDb(TEST_URL)
 afterAll(() => pool.end())
 
 describe('migrations', () => {
-  it('creates samples and disk_samples tables and is idempotent', async () => {
+  it('creates samples, disk_samples, events and hosts tables and is idempotent', async () => {
     await runMigrations(db)
     await runMigrations(db)
-    const r = await db.execute(sql`select table_name from information_schema.tables where table_schema='public' and table_name in ('samples','disk_samples')`)
-    expect(r.rows.map((x: any) => x.table_name).sort()).toEqual(['disk_samples', 'samples'])
+    const r = await db.execute(sql`select table_name from information_schema.tables where table_schema='public' and table_name in ('samples','disk_samples','events','hosts')`)
+    expect(r.rows.map((x: any) => x.table_name).sort()).toEqual(['disk_samples', 'events', 'hosts', 'samples'])
   })
 })
