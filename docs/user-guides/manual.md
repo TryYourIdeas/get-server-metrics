@@ -41,6 +41,18 @@ docker exec computer-usage-db psql -U postgres -d computer-usage \
 
 Sizes are bytes; `cpu_percent` is 0–100.
 
+## Testing the agent on different servers
+
+`docker-compose.test-servers.yml` starts the agent in six throwaway containers that connect to the project's Mosquitto broker: Debian 12, Ubuntu 24.04, Fedora 41, Alpine 3.20 (musl libc and busybox tools), Debian 12 with Node 24, and one "alert" agent whose disk threshold is 1% so it publishes an event right away.
+
+1. Start the main stack and make sure the `app` broker user exists (see *Getting started*).
+2. Run `APP_PASSWORD=<app broker password> docker/test-servers/run.sh`. It creates a broker user per test agent (password `TEST_AGENT_PASSWORD`, default `test-agents-pw`), builds and starts the containers, then listens on the broker for `WAIT_SECONDS` (default 45) and prints `ok` or `FAIL` per host.
+3. `run.sh up`, `run.sh verify` and `run.sh down` run the steps separately. Use `docker compose -f docker-compose.yml -f docker-compose.test-servers.yml logs agent-alpine` to see one agent's logs (debug tracing is on).
+
+A host passes when it reports `online`, publishes a heartbeat with a memory reading and at least one disk; the alert agent must also publish an `alert` event. The test hosts (`test-*`) also appear in the dashboard while they run.
+
+Each container mounts a volume on `/data`: a container's own root filesystem is `overlay`, which the agent ignores on purpose, so without a real mount it would report no disk.
+
 ## Troubleshooting
 
 - **A machine does not appear, or appears but never shows data**: check the agent log. `connected to broker` means it reached Mosquitto. A connection error with "not authorized" means the user/password is wrong. If the agent connects but nothing arrives, its `MQTT_USERNAME` is probably not its `HOST_ID` (the agent logs an error about this at startup, and a shell variable can override the `.env` file): the broker silently drops what a user publishes outside its own host topic. Check the event monitor log for `mqtt message rejected` (invalid or hostile payloads) or `ingest failed`.
