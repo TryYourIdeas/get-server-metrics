@@ -48,3 +48,11 @@ docker compose up -d                               # or: npm run db:up
 - The event monitor subscribes with a persistent session, so the broker holds messages while the monitor is down, but only after it has connected once. Start the monitor before the agents on a brand-new install, or click Check now to fetch the first reading.
 - Tables are created automatically by migrations when the event monitor boots. After changing `shared/server/db/schema.ts`, run `npm run db:generate`; migration files are stored in `shared/drizzle/`.
 - When the event monitor and viewer run on different machines, bind the monitor to a reachable private-network address and set `EVENT_MONITOR_TOKEN` in both apps. Keep the monitor behind a trusted network or firewall.
+
+## Agent compatibility test containers
+
+| Variable | Default | Description |
+|---|---|---|
+| `TEST_AGENT_PASSWORD` | `test-agents-pw` | Broker password given to every `test-*` agent user by `docker/test-servers/run.sh`. |
+| `APP_PASSWORD` | required for `verify` | Broker password of the `app` user, used to listen for the agents' messages. |
+| `WAIT_SECONDS` | `45` | How long `verify` listens before judging each host. |

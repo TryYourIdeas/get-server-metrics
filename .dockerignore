@@ -1,0 +1,9 @@
+**/node_modules
+**/.nuxt
+**/.output
+**/.env
+**/.env.*
+.git
+docs
+dashboard
+event-monitor
