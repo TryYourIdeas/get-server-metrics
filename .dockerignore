@@ -5,5 +5,3 @@
 **/.env.*
 .git
 docs
-dashboard
-event-monitor

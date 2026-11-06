@@ -1,0 +1,19 @@
+# Dashboard for the test stack: builds the Nuxt app and runs the standalone server.
+# Build context is the repository root (the dashboard imports ../shared and the agent's protocol).
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY agent/package.json agent/
+COPY event-monitor/package.json event-monitor/
+COPY dashboard/package.json dashboard/
+RUN npm ci --ignore-scripts
+COPY agent agent
+COPY shared shared
+COPY dashboard dashboard
+RUN npm --workspace dashboard run build
+
+FROM node:22-bookworm-slim
+WORKDIR /app
+COPY --from=build /app/dashboard/.output ./
+ENV HOST=0.0.0.0 PORT=3000
+CMD ["node", "server/index.mjs"]
