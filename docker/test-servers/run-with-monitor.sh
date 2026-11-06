@@ -50,7 +50,9 @@ for p in "$MONITOR_PORT" "$DASHBOARD_PORT"; do
   fi
 done
 
-docker/test-servers/run.sh up
+# SKIP_APPS=1: this script runs the monitor and dashboard on this machine, so run.sh must not start its
+# containerized ones (same ports).
+SKIP_APPS=1 docker/test-servers/run.sh up
 
 logdir="$(mktemp -d -t run-with-monitor.XXXXXX)"
 : >"$pidfile"

@@ -53,6 +53,10 @@ docker compose up -d                               # or: npm run db:up
 
 | Variable | Default | Description |
 |---|---|---|
-| `TEST_AGENT_PASSWORD` | `test-agents-pw` | Broker password given to every `test-*` agent user by `docker/test-servers/run.sh`. |
-| `APP_PASSWORD` | required for `verify` | Broker password of the `app` user, used to listen for the agents' messages. |
+| `APP_PASSWORD` | required | Broker password of the `app` user. `run.sh` creates the user with it; the test event monitor logs in with it and `verify` uses it to listen for the agents' messages. |
+| `TEST_AGENT_PASSWORD` | required | Broker password given to every `test-*` agent user by `docker/test-servers/run.sh`. |
 | `WAIT_SECONDS` | `45` | How long `verify` listens before judging each host. |
+| `DASHBOARD_PORT` | `3000` | Host port of the test dashboard. |
+| `SKIP_APPS` | `0` | `1` leaves the event monitor and dashboard containers out (used by `run-with-monitor.sh`). |
+
+`APP_PASSWORD` and `TEST_AGENT_PASSWORD` are not needed for `run.sh down`.
