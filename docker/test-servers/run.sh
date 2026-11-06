@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 # Usage: APP_PASSWORD=<pw> TEST_AGENT_PASSWORD=<pw> docker/test-servers/run.sh [up|verify|down]
-#   up      create the broker users (app and the test agents) for the test agents, build and start the agent containers
-#   verify  wait for every agent to report a heartbeat (and the alert agent an event) through the broker
-#   down    stop and remove the test containers (and their volume)
-# With no argument it runs up then verify.
+#   up      create the broker users (app and the test agents), build and start the agent containers, the event
+#           monitor (stores readings in Postgres) and the dashboard
+#   verify  check that every agent reached the broker, that its readings were saved in the database
+#           and that the dashboard lists it
+#   down    stop and remove the test containers and their volume, and delete the test-* hosts' data
+#           from the database
+# With no argument it runs up then verify. The dashboard is at http://localhost:${DASHBOARD_PORT:-3000}.
+# SKIP_APPS=1 leaves the event monitor and dashboard containers out (run-with-monitor.sh runs them on this
+# machine instead); verify then skips the database and dashboard checks.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -12,6 +17,10 @@ cd "$root"
 HOSTS=(test-debian12 test-ubuntu2404 test-fedora test-alpine test-node24 test-alert)
 ALERT_HOST=test-alert
 WAIT_SECONDS="${WAIT_SECONDS:-45}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
+export DASHBOARD_PORT
+SKIP_APPS="${SKIP_APPS:-0}"
+SERVICES=(agent-debian12 agent-ubuntu2404 agent-fedora agent-alpine agent-node24 agent-alert event-monitor dashboard)
 compose=(docker compose -f docker-compose.yml -f docker-compose.test-servers.yml)
 
 usage() {
@@ -41,7 +50,11 @@ up() {
   for h in "${HOSTS[@]}"; do docker/mosquitto/add-user.sh "$h" "$TEST_AGENT_PASSWORD" >/dev/null; done
   "${compose[@]}" up -d --build mosquitto
   "${compose[@]}" restart mosquitto # pick up the new passwd entries
-  "${compose[@]}" up -d --build
+  if [ "$SKIP_APPS" = 1 ]; then
+    "${compose[@]}" up -d --build
+  else
+    "${compose[@]}" --profile apps up -d --build
+  fi
 }
 
 verify() {
@@ -72,10 +85,46 @@ verify() {
   else
     echo "ok    $ALERT_HOST published an alert event"
   fi
+
+  if [ "$SKIP_APPS" != 1 ]; then
+    echo "Checking the database..."
+    psql_q() { "${compose[@]}" exec -T postgres psql -U postgres -d computer-usage -tAc "$1"; }
+    sleep 3 # let the monitor finish storing the last messages
+    for h in "${HOSTS[@]}"; do
+      n=$(psql_q "select count(*) from samples where host_id = '$h'" 2>/dev/null || echo 0)
+      d=$(psql_q "select count(*) from disk_samples ds join samples s on s.id = ds.sample_id where s.host_id = '$h'" 2>/dev/null || echo 0)
+      if [ "${n:-0}" -ge 1 ] && [ "${d:-0}" -ge 1 ]; then echo "ok    $h: $n samples saved"; else echo "FAIL  $h: nothing saved in the database (samples=$n, disk rows=$d)"; failed=1; fi
+    done
+    e=$(psql_q "select count(*) from events where host_id = '$ALERT_HOST' and state = 'alert'" 2>/dev/null || echo 0)
+    if [ "${e:-0}" -ge 1 ]; then echo "ok    $ALERT_HOST: alert event saved"; else echo "FAIL  $ALERT_HOST: alert event not saved in the database"; failed=1; fi
+
+    echo "Checking the dashboard..."
+    hosts_json=$(curl -fsS --max-time 10 "http://localhost:$DASHBOARD_PORT/api/hosts" 2>/dev/null || true)
+    if [[ -z "$hosts_json" ]]; then
+      echo "FAIL  dashboard: no answer from http://localhost:$DASHBOARD_PORT/api/hosts"; failed=1
+    else
+      grep -q '"brokerConnected":true' <<<"$hosts_json" || { echo "FAIL  dashboard: event monitor is not connected to the broker"; failed=1; }
+      for h in "${HOSTS[@]}"; do
+        if grep -q "\"$h\"" <<<"$hosts_json"; then echo "ok    dashboard lists $h"; else echo "FAIL  dashboard does not list $h"; failed=1; fi
+      done
+    fi
+  fi
+
   if [ "$failed" -ne 0 ]; then echo "Logs: ${compose[*]} logs <service>"; exit 1; fi
+  if [ "$SKIP_APPS" != 1 ]; then echo; echo "All good. Open the dashboard: http://localhost:$DASHBOARD_PORT"; fi
 }
 
-down() { "${compose[@]}" rm -sf $(printf 'agent-%s ' debian12 ubuntu2404 fedora alpine node24 alert) && docker volume rm -f computer-usage_testdata >/dev/null || true; }
+down() {
+  # Remove the data the test agents stored, so the dashboard does not keep showing dead test hosts.
+  # (Postgres may not be running; then there is nothing to clean.)
+  "${compose[@]}" exec -T postgres psql -U postgres -d computer-usage -c \
+    "delete from samples where host_id like 'test-%'; delete from events where host_id like 'test-%'; delete from hosts where host_id like 'test-%';" \
+    >/dev/null 2>&1 || echo "note: could not clean test data from the database (is Postgres running?)"
+  "${compose[@]}" --profile apps rm -sf "${SERVICES[@]}"
+  # Compose names the volume <project>_testdata, and the project defaults to this folder's name.
+  project="${COMPOSE_PROJECT_NAME:-$(basename "$root" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9_-]//g')}"
+  docker volume rm -f "${project}_testdata" >/dev/null || true
+}
 
 case "${1:-all}" in
   up) up ;;

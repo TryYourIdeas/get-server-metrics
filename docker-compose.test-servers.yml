@@ -1,4 +1,7 @@
-# Runs the agent on several Linux distributions / Node versions against the broker from docker-compose.yml.
+# Runs the agent on several Linux distributions / Node versions against the broker from docker-compose.yml,
+# plus the event monitor (stores the readings in Postgres) and the dashboard (graphs) to see the data end to end.
+# The monitor and dashboard are in the "apps" profile: docker/test-servers/run.sh enables it unless SKIP_APPS=1
+# (run-with-monitor.sh runs them on the host instead).
 # Use it together with the main file (see docker/test-servers/run.sh):
 #   docker compose -f docker-compose.yml -f docker-compose.test-servers.yml up -d --build
 #
@@ -12,12 +15,61 @@ x-agent: &agent
     - testdata:/data
   environment: &agent-env
     MQTT_URL: mqtt://mosquitto:1883
-    MQTT_PASSWORD: ${TEST_AGENT_PASSWORD:-test-agents-pw}
+    MQTT_PASSWORD: ${TEST_AGENT_PASSWORD:-}
     HEARTBEAT_INTERVAL_MS: "10000"
     CHECK_INTERVAL_MS: "5000"
     NUXT_ADD_DEBUG_LOGS: "true"
 
+x-monitor-token: &monitor-token test-monitor-token
+
 services:
+  # Same Postgres as docker-compose.yml, with a health check so the monitor waits for it.
+  postgres:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d computer-usage"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  event-monitor:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: docker/test-servers/Dockerfile.event-monitor
+    restart: on-failure
+    depends_on:
+      postgres: { condition: service_healthy }
+      mosquitto: { condition: service_started }
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/computer-usage
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USERNAME: app
+      MQTT_PASSWORD: ${APP_PASSWORD:-}
+      # Must match the agents' heartbeat interval below.
+      HEARTBEAT_INTERVAL_MS: "10000"
+      # Not loopback inside the container, so a token is mandatory.
+      EVENT_MONITOR_HOST: 0.0.0.0
+      EVENT_MONITOR_PORT: "3100"
+      EVENT_MONITOR_TOKEN: *monitor-token
+      NUXT_ADD_DEBUG_LOGS: "true"
+
+  dashboard:
+    profiles: ["apps"]
+    build:
+      context: .
+      dockerfile: docker/test-servers/Dockerfile.dashboard
+    restart: on-failure
+    depends_on:
+      postgres: { condition: service_healthy }
+      event-monitor: { condition: service_started }
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/computer-usage
+      EVENT_MONITOR_URL: http://event-monitor:3100
+      EVENT_MONITOR_TOKEN: *monitor-token
+      NUXT_ADD_DEBUG_LOGS: "true"
+
   agent-debian12:
     <<: *agent
     build:
