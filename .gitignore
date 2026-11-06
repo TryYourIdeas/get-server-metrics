@@ -24,3 +24,6 @@ logs
 !.env.example
 .superpowers
 docker/mosquitto/passwd
+
+# run-with-monitor.sh runtime state
+docker/test-servers/.run-with-monitor.pids
