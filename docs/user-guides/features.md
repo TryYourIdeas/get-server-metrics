@@ -1,8 +1,10 @@
 # Features
 
-- **Many machines, one dashboard** — an agent on each machine reports CPU %, memory used/total and every real disk's used/total over MQTT; a machine picker switches between them.
+- **Many machines, one dashboard** — an agent on each machine reports CPU %, memory used/total and every real disk's used/total over MQTT; a machine picker switches between them, and **All servers** shows every machine at once.
 - **Heartbeat plus events** — each agent sends a reading every 5 minutes (stored in Postgres, tagged by host) and an immediate event when CPU, memory or a disk crosses its threshold, and again when it recovers.
-- **Alerts** — thresholds are set on each agent (defaults: CPU 90% for 3 consecutive checks, memory 90%, each disk 90%). Open alerts show as a red banner; recent alerts and recoveries are listed.
+- **All servers view** — a card per machine with its status (online, offline, no recent data, waiting for data), live CPU, memory and disk gauges and any open alert. Machines with open alerts come first, then offline ones. It updates live; click a card to open that machine.
+- **Alerts** — default thresholds are CPU 90% for 3 consecutive checks, memory 90%, each disk 90%. Open alerts show as a red banner; recent alerts and recoveries are listed.
+- **Editable triggers** — the **Triggers** page sets one default set of thresholds for every machine and an optional override per machine. Changes reach running agents within seconds, without restarting them (agents that are offline receive them when they reconnect). Until something is saved there, agents use the values in their own `.env`. The dashboard has no login: anyone who can open it can change the triggers.
 - **Check now** — fetches a fresh reading from the selected machine on demand (not stored).
 - **Live updates without polling** — the standalone Node.js event monitor relays readings and events to the Nuxt viewer over Server-Sent Events, and the viewer reconnects and re-syncs by itself.
 - **Machine status** — online, offline (agent stopped) or no recent data; banners show when the MQTT broker or the live connection is down.
@@ -13,7 +15,7 @@
 - **Separate event-monitor service** — a Node.js workspace owns MQTT ingestion, database migrations/writes, check-now publishing, and data retention; the Nuxt viewer reads PostgreSQL and proxies live updates.
 - **Data retention** — samples and events older than `RETENTION_DAYS` (default 30) are deleted by the event monitor once at startup and then daily. Set `0` to keep everything.
 - **Resilient transport** — QoS 1 with persistent sessions, a bounded offline queue on each agent, duplicate deliveries ignored, invalid messages logged and dropped.
-- **Per-agent broker access** — each agent has its own broker user and can only publish under its own host topic.
+- **Per-agent broker access** — each agent has its own broker user, can only publish under its own host topic and can only read its own `check` and `config` topics.
 - **Automatic schema migrations** when the event monitor starts (existing single-machine rows become host `local`).
 - **Diagnostics** — structured error logs with context; optional tracing via `NUXT_ADD_DEBUG_LOGS`.
-- **JSON API** — `GET /api/hosts`, `GET /api/metrics/current?host=`, `GET /api/metrics/history?range=1h|24h|7d&host=`, `GET /api/events?host=`, `POST /api/hosts/:host/check`, `DELETE /api/hosts/:host/logs`, `GET /api/stream` (SSE).
+- **JSON API** — `GET /api/hosts`, `GET /api/metrics/current?host=`, `GET /api/metrics/history?range=1h|24h|7d&host=`, `GET /api/events?host=`, `POST /api/hosts/:host/check`, `DELETE /api/hosts/:host/logs`, `GET /api/overview`, `GET`/`PUT /api/thresholds`, `PUT`/`DELETE /api/hosts/:host/thresholds`, `GET /api/stream` (SSE).

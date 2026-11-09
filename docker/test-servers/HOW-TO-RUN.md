@@ -65,15 +65,20 @@ ok    test-alert: alert event saved
 Checking the dashboard...
 ok    dashboard lists test-debian12
 ...
+Checking threshold changes...
+ok    lowering test-debian12's disk threshold raised an alert
+ok    removing the override recovered the alert
+ok    the retained config for test-debian12 holds the default again
+ok    agents cannot publish config messages
 
 All good. Open the dashboard: http://localhost:3000
 ```
 
-A `FAIL` line names the host and the reason (never came online, no heartbeat, no memory reading, no disk, nothing saved in the database, not listed by the dashboard). The script exits non-zero if anything failed.
+A `FAIL` line names the host and the reason (never came online, no heartbeat, no memory reading, no disk, nothing saved in the database, not listed by the dashboard, a threshold change that did not reach the agent, or an agent that was able to publish a config message). The script exits non-zero if anything failed.
 
 ### 5. Look at the graphs
 
-Open <http://localhost:3000>. The six `test-*` hosts appear with live CPU, memory and disk readings (a new reading every 10 seconds). `test-alert` also shows a disk alert event.
+Open <http://localhost:3000>. The **All servers** view shows the six `test-*` hosts as cards, with live CPU, memory and disk readings (a new reading every 10 seconds). Pick a machine for its charts, and use **Triggers** to change thresholds. `test-alert` also shows a disk alert.
 
 ### 6. Clean up
 

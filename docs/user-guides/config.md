@@ -31,6 +31,10 @@ Start from `event-monitor/.env.example`.
 
 Shell environment variables take precedence over values loaded from each app's `.env` file.
 
+## Alert thresholds (dashboard and agents)
+
+The thresholds (`CPU_THRESHOLD_PERCENT`, `CPU_CONSECUTIVE_CHECKS`, `MEMORY_THRESHOLD_PERCENT`, `DISK_THRESHOLD_PERCENT`) are the agent's starting values. Once someone saves thresholds on the dashboard's **Triggers** page, the event monitor publishes each machine's effective values (its own override, else the default set, else the built-in 90 / 3 / 90 / 90) as a retained message on `computer-usage/<host>/config`, and the agent switches to them without restarting. Valid values: percentages from 1 to 100, consecutive checks a whole number of 1 or more. The dashboard has no login, so only expose it on a trusted network.
+
 ## Agent (one per machine)
 
 See `agent/README.md` for the full table: `HOST_ID`, `MQTT_URL`, `MQTT_USERNAME` (must equal `HOST_ID`; the agent logs an error at startup if it does not), `MQTT_PASSWORD`, `HEARTBEAT_INTERVAL_MS`, `CHECK_INTERVAL_MS`, `CPU_THRESHOLD_PERCENT`, `CPU_CONSECUTIVE_CHECKS`, `MEMORY_THRESHOLD_PERCENT`, `DISK_THRESHOLD_PERCENT`, `QUEUE_LIMIT`.
@@ -44,7 +48,7 @@ docker compose up -d                               # or: npm run db:up
 ```
 
 - Postgres: image `postgres:18`, container `computer-usage-db`, host port **5433**. Databases `computer-usage` (app) and `computer-usage-test` (tests) are created on the first start. The init script runs only when the volume is first created; if `computer-usage-test` is missing, run `docker compose down -v && docker compose up -d` (this deletes stored samples).
-- Mosquitto: image `eclipse-mosquitto:2`, container `computer-usage-mqtt`, port **1883**, authentication required. Users live in `docker/mosquitto/passwd` (not committed); `docker/mosquitto/acl` lets the event monitor read everything and publish check requests, and lets each agent publish only its own `heartbeat`, `event`, `reading` and `status` topics and read its own `check` topic. After adding a user, `docker compose restart mosquitto`. The broker is meant for a trusted network (LAN/VPN): it has no TLS yet.
+- Mosquitto: image `eclipse-mosquitto:2`, container `computer-usage-mqtt`, port **1883**, authentication required. Users live in `docker/mosquitto/passwd` (not committed); `docker/mosquitto/acl` lets the event monitor read everything and publish check requests, lets the event monitor publish each agent's thresholds to `computer-usage/<host>/config`, and lets each agent publish only its own `heartbeat`, `event`, `reading` and `status` topics and read only its own `check` and `config` topics. **After upgrading to the version with editable thresholds, restart the broker** (`docker compose restart mosquitto`) so the new ACL lines apply; until then agents keep working with the values in their `.env` but do not receive dashboard changes. After adding a user, `docker compose restart mosquitto`. The broker is meant for a trusted network (LAN/VPN): it has no TLS yet.
 - The event monitor subscribes with a persistent session, so the broker holds messages while the monitor is down, but only after it has connected once. Start the monitor before the agents on a brand-new install, or click Check now to fetch the first reading.
 - Tables are created automatically by migrations when the event monitor boots. After changing `shared/server/db/schema.ts`, run `npm run db:generate`; migration files are stored in `shared/drizzle/`.
 - When the event monitor and viewer run on different machines, bind the monitor to a reachable private-network address and set `EVENT_MONITOR_TOKEN` in both apps. Keep the monitor behind a trusted network or firewall.

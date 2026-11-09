@@ -20,22 +20,17 @@
 - **Value:** Failures become visible and the charts stop suggesting data that does not exist.
 - **Consequence of not doing it:** A database outage looks like "not enough data yet", a hung collector silently stops sampling, a missing CPU reading is stored as 0%, and gaps/short histories are drawn misleadingly.
 
-## 5. Central threshold configuration
-- **Description:** Edit alert thresholds (per host or fleet-wide) from the dashboard or app config and push them to agents over MQTT, with safe defaults on the agent if the app is down.
-- **Value:** Tune alerting for the whole fleet in one place.
-- **Consequence of not doing it:** Changing a threshold means editing that machine's agent config and restarting it.
-
-## 6. TLS for the MQTT broker
+## 5. TLS for the MQTT broker
 - **Description:** Enable TLS on Mosquitto with certificates and make agents and the app verify it.
 - **Value:** Safe use over untrusted networks and the internet.
 - **Consequence of not doing it:** Credentials and readings travel unencrypted, so the broker must stay on a trusted LAN/VPN.
 
-## 7. Viewer-driven fast live mode
+## 6. Viewer-driven fast live mode
 - **Description:** While a browser has a host open, have the app send `check` requests every few seconds so charts move faster than the 5-minute heartbeat; stop when the last viewer leaves.
 - **Value:** Near-real-time charts when someone is watching.
 - **Consequence of not doing it:** Between heartbeats the dashboard only changes on events or when Check now is clicked.
 
-## 8. Agent reports broker-side rejections
+## 7. Agent reports broker-side rejections
 - **Description:** Use MQTT 5 (reason codes on publish acknowledgements) so an agent learns when the broker drops its messages for ACL reasons; today it only warns at startup if `MQTT_USERNAME` differs from `HOST_ID`.
 - **Value:** A misconfigured agent fails loudly instead of silently showing no data.
 - **Consequence of not doing it:** Other ACL or credential mix-ups still look like "connected but nothing arrives".
