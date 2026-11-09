@@ -62,3 +62,47 @@ describe('disk', () => {
     expect(e(r({ disks: disks(10, 95) }))).toMatchObject([{ kind: 'disk', state: 'alert', mount: '/data' }])
   })
 })
+
+describe('changing thresholds while running', () => {
+  const memory = (pct: number) => r({ memUsed: pct, memTotal: 100 })
+
+  it('keeps an active alert: no duplicate alert after a threshold change', () => {
+    const e = ev()
+    expect(e(memory(95))).toMatchObject([{ kind: 'memory', state: 'alert', threshold: 90 }])
+    e.setThresholds({ ...DEFAULT_THRESHOLDS, memoryPercent: 80 })
+    expect(e(memory(95))).toEqual([])
+  })
+
+  it('a raised threshold clears an alert with an ok that reports the new threshold', () => {
+    const e = ev()
+    e(memory(95))
+    e.setThresholds({ ...DEFAULT_THRESHOLDS, memoryPercent: 99 })
+    expect(e(memory(95))).toMatchObject([{ kind: 'memory', state: 'ok', threshold: 99 }])
+    expect(e(memory(95))).toEqual([])
+  })
+
+  it('a lowered threshold alerts on the next check', () => {
+    const e = ev()
+    expect(e(memory(85))).toEqual([])
+    e.setThresholds({ ...DEFAULT_THRESHOLDS, memoryPercent: 80 })
+    expect(e(memory(85))).toMatchObject([{ kind: 'memory', state: 'alert', threshold: 80 }])
+  })
+
+  it('applies to a disk mount the same way', () => {
+    const e = ev()
+    const disk = (pct: number) => r({ disks: [{ mount: '/', used: pct, total: 100 }] })
+    expect(e(disk(95))).toMatchObject([{ kind: 'disk', state: 'alert', mount: '/' }])
+    e.setThresholds({ ...DEFAULT_THRESHOLDS, diskPercent: 99 })
+    expect(e(disk(95))).toMatchObject([{ kind: 'disk', state: 'ok', mount: '/', threshold: 99 }])
+  })
+
+  it('restarts the CPU streak when the thresholds change', () => {
+    const e = ev()
+    expect(e(r({ cpuPercent: 95 }))).toEqual([])
+    expect(e(r({ cpuPercent: 95 }))).toEqual([])
+    e.setThresholds({ ...DEFAULT_THRESHOLDS, cpuPercent: 50 })
+    expect(e(r({ cpuPercent: 95 }))).toEqual([])
+    expect(e(r({ cpuPercent: 95 }))).toEqual([])
+    expect(e(r({ cpuPercent: 95 }))).toMatchObject([{ kind: 'cpu', state: 'alert', threshold: 50 }])
+  })
+})

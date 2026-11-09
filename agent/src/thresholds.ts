@@ -11,13 +11,19 @@ const pct = (used: number, total: number) => (total > 0 ? (used / total) * 100 :
  * CPU needs `cpuConsecutive` checks in a row at or above the threshold; memory and disk alert on the first.
  * A mount that vanishes while alerting emits an `ok` so the alert can clear.
  */
-export function createThresholdEvaluator(t: Thresholds): (r: Reading) => UsageEvent[] {
+export type ThresholdEvaluator = ((r: Reading) => UsageEvent[]) & {
+  /** Switches to new thresholds. Alert state is kept; only the CPU streak restarts. */
+  setThresholds(next: Thresholds): void
+}
+
+export function createThresholdEvaluator(initial: Thresholds): ThresholdEvaluator {
+  let t = initial
   let cpuStreak = 0
   let cpuAlert = false
   let memAlert = false
   const diskAlert = new Map<string, boolean>()
 
-  return (r) => {
+  const evaluate = (r: Reading): UsageEvent[] => {
     const out: UsageEvent[] = []
     const event = (kind: EventKind, state: 'alert' | 'ok', value: number, threshold: number, mount?: string): UsageEvent =>
       ({ kind, state, value: round1(value), threshold, ts: r.ts, ...(mount ? { mount } : {}) })
@@ -62,4 +68,11 @@ export function createThresholdEvaluator(t: Thresholds): (r: Reading) => UsageEv
     }
     return out
   }
+
+  return Object.assign(evaluate, {
+    setThresholds(next: Thresholds) {
+      t = next
+      cpuStreak = 0
+    }
+  })
 }
