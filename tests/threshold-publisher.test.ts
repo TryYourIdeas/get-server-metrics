@@ -17,7 +17,8 @@ beforeEach(() => {
   publish = vi.fn().mockResolvedValue(undefined)
   publisher = createThresholdPublisher({
     repo: { getThresholdSettings: async () => settings, listHosts: async () => hosts.map(host) },
-    publish
+    publish,
+    retry: { attempts: 3, delayMs: 0 }
   })
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -42,6 +43,20 @@ describe('publishHost', () => {
   })
 })
 
+describe('publishHost retries', () => {
+  it('retries a failing publish until it succeeds, so a brief broker outage does not strand a stale config', async () => {
+    publish.mockRejectedValueOnce(new Error('broker down')).mockRejectedValueOnce(new Error('broker down'))
+    await expect(publisher.publishHost('a')).resolves.toBeUndefined()
+    expect(publish).toHaveBeenCalledTimes(3)
+  })
+
+  it('gives up after the configured attempts and rejects', async () => {
+    publish.mockRejectedValue(new Error('broker down'))
+    await expect(publisher.publishHost('a')).rejects.toThrow('broker down')
+    expect(publish).toHaveBeenCalledTimes(3)
+  })
+})
+
 describe('publishAll', () => {
   it('sends the effective values to every known host', async () => {
     settings = { defaults: custom, overrides: { b: { cpuPercent: 99 } } }
@@ -50,10 +65,10 @@ describe('publishAll', () => {
     expect(publish).toHaveBeenCalledWith('b', { ...custom, cpuPercent: 99 })
   })
 
-  it('keeps going when one publish fails', async () => {
-    publish.mockRejectedValueOnce(new Error('broker down'))
+  it('keeps going when one host cannot be reached', async () => {
+    publish.mockImplementation(async (h: string) => { if (h === 'a') throw new Error('broker down') })
     await expect(publisher.publishAll()).resolves.toBeUndefined()
-    expect(publish).toHaveBeenCalledTimes(2)
+    expect(publish).toHaveBeenCalledWith('b', DEFAULT_THRESHOLDS)
   })
 })
 

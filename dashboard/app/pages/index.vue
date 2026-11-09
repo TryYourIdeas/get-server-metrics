@@ -30,7 +30,12 @@ watch(overviewData, (v) => { overview.value = v?.entries ?? [] })
 // Points received over the stream, merged after the stored history so charts move between database re-syncs.
 const live = ref<Reading[]>([])
 watch([range, host], () => { live.value = [] })
-watch(host, (h) => { if (h) void Promise.all([refreshCurrent(), refreshHistory(), refreshEvents()]) })
+watch(host, (h) => {
+  // Messages about the previous machine must not follow the user to another view.
+  checkMessage.value = ''
+  logsMessage.value = ''
+  if (h) void Promise.all([refreshCurrent(), refreshHistory(), refreshEvents()])
+})
 watch(range, () => { if (host.value) void refreshHistory() })
 
 const brokerConnected = ref(hostsData.value?.brokerConnected ?? false)
@@ -53,7 +58,7 @@ const hostStatus = computed(() => {
   if (stale.value) return 'no recent data'
   return selectedHost.value.online ? 'online' : 'offline'
 })
-const alerts = computed(() => activeAlerts(events.value ?? []))
+const alerts = computed(() => alertsForView(host.value, events.value ?? []))
 const sortedOverview = computed(() => sortEntries(overview.value, now.value, hostsData.value?.staleAfterMs ?? 600_000))
 
 function finishCheck(message = '') {

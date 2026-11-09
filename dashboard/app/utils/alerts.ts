@@ -12,6 +12,9 @@ export function activeAlerts(events: UsageEvent[]): UsageEvent[] {
   return [...latest.values()].filter(e => e.state === 'alert')
 }
 
+/** The alerts to show for the current view: none in the all-servers view (`host` undefined), whatever `events` still holds. */
+export const alertsForView = (host: string | undefined, events: UsageEvent[]): UsageEvent[] => (host ? activeAlerts(events) : [])
+
 /** A host is stale when nothing (heartbeat, event or status) arrived for longer than `staleAfterMs`. */
 export const isStale = (lastSeen: string | undefined, now: number, staleAfterMs: number): boolean =>
   !lastSeen || now - Date.parse(lastSeen) > staleAfterMs

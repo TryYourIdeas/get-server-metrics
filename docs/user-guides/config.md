@@ -33,7 +33,7 @@ Shell environment variables take precedence over values loaded from each app's `
 
 ## Alert thresholds (dashboard and agents)
 
-The thresholds (`CPU_THRESHOLD_PERCENT`, `CPU_CONSECUTIVE_CHECKS`, `MEMORY_THRESHOLD_PERCENT`, `DISK_THRESHOLD_PERCENT`) are the agent's starting values. Once someone saves thresholds on the dashboard's **Triggers** page, the event monitor publishes each machine's effective values (its own override, else the default set, else the built-in 90 / 3 / 90 / 90) as a retained message on `computer-usage/<host>/config`, and the agent switches to them without restarting. Valid values: percentages from 1 to 100, consecutive checks a whole number of 1 or more. The dashboard has no login, so only expose it on a trusted network.
+The thresholds (`CPU_THRESHOLD_PERCENT`, `CPU_CONSECUTIVE_CHECKS`, `MEMORY_THRESHOLD_PERCENT`, `DISK_THRESHOLD_PERCENT`) are the agent's starting values, used until the event monitor sends it any. From the first time anything is saved on the Triggers page, the dashboard's values replace the `.env` ones for good (removing an override sends the defaults, not the `.env` values). Once someone saves thresholds on the dashboard's **Triggers** page, the event monitor publishes each machine's effective values (its own override, else the default set, else the built-in 90 / 3 / 90 / 90) as a retained message on `computer-usage/<host>/config`, and the agent switches to them without restarting. Valid values: percentages from 1 to 100, consecutive checks a whole number of 1 or more. The dashboard has no login, so only expose it on a trusted network.
 
 ## Agent (one per machine)
 
