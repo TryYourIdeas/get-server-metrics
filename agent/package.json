@@ -15,7 +15,9 @@
   "scripts": {
     "start": "tsx --env-file-if-exists=.env src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "vite build",
+    "start:bundle": "node --env-file-if-exists=.env dist/agent.mjs"
   },
   "dependencies": {
     "mqtt": "^5.16.0",
@@ -26,6 +28,7 @@
     "aedes": "^1.2.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
+    "vite": "^8.3.1",
     "vitest": "^5.0.3"
   }
 }

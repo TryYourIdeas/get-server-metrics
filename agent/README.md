@@ -10,6 +10,18 @@ Reports this machine's CPU, memory and disk usage to the computer-usage app over
 
 The agent publishes a heartbeat reading every `HEARTBEAT_INTERVAL_MS` (default 5 min) and an event when CPU, memory or a disk crosses its threshold (and when it recovers). It also answers "Check now" requests from the dashboard.
 
+## Build a distributable bundle
+
+    npm run build            # writes dist/agent.mjs
+
+`dist/agent.mjs` is a single self-contained file (mqtt and systeminformation are inlined), so a server only needs **Node.js 20.12 or newer**: no `npm install`, no `node_modules`. Copy the file to the server and run it:
+
+    scp dist/agent.mjs user@server:/opt/agent/
+    # on the server, in /opt/agent: create .env (see .env.example) or export the variables, then
+    node agent.mjs
+
+The agent reads a `.env` file from the directory it is started in; variables already set in the environment win. For a quick check from this folder: `npm run start:bundle`. The build output (`dist/`) is not committed.
+
 ## Configuration
 
 | Variable | Default | Description |
