@@ -86,3 +86,53 @@ describe('agent', () => {
     expect(hb).toBeDefined()
   })
 })
+
+describe('agent threshold config', () => {
+  const cfg = (o: Record<string, unknown> = {}) => JSON.stringify({ cpuPercent: 90, cpuConsecutive: 3, memoryPercent: 70, diskPercent: 90, ...o })
+  const configTopic = 'computer-usage/h1/config'
+  const memoryAlert = (msgs: Msg[]) => msgs.find(m => m.topic === 'computer-usage/h1/event' && m.payload.kind === 'memory' && m.payload.state === 'alert')
+
+  it('applies a retained config that was published before it started', async () => {
+    const broker = await startBroker(); cleanup.push(() => broker.stop())
+    const { client, msgs } = await observe(broker.url); cleanup.push(() => client.endAsync())
+    await client.publishAsync(configTopic, cfg(), { qos: 1, retain: true })
+    const agent = startAgent(config(broker.url, { checkIntervalMs: 100 }), async () => reading({ memUsed: 80 })); cleanup.push(() => agent.stop())
+    const alert = await waitFor(() => memoryAlert(msgs))
+    expect(alert.payload.threshold).toBe(70)
+  })
+
+  it('applies a config received while running', async () => {
+    const broker = await startBroker(); cleanup.push(() => broker.stop())
+    const { client, msgs } = await observe(broker.url); cleanup.push(() => client.endAsync())
+    const agent = startAgent(config(broker.url, { checkIntervalMs: 100 }), async () => reading({ memUsed: 80 })); cleanup.push(() => agent.stop())
+    await waitFor(() => msgs.find(m => m.topic === 'computer-usage/h1/status' && m.payload.state === 'online'))
+    await new Promise(r => setTimeout(r, 500))
+    expect(memoryAlert(msgs)).toBeUndefined()
+    await client.publishAsync(configTopic, cfg(), { qos: 1 })
+    const alert = await waitFor(() => memoryAlert(msgs))
+    expect(alert.payload.threshold).toBe(70)
+  })
+
+  it('ignores invalid configs and keeps its thresholds', async () => {
+    const broker = await startBroker(); cleanup.push(() => broker.stop())
+    const { client, msgs } = await observe(broker.url); cleanup.push(() => client.endAsync())
+    const agent = startAgent(config(broker.url, { checkIntervalMs: 100 }), async () => reading({ memUsed: 95 })); cleanup.push(() => agent.stop())
+    await waitFor(() => msgs.find(m => m.topic === 'computer-usage/h1/status' && m.payload.state === 'online'))
+    await client.publishAsync(configTopic, cfg({ cpuPercent: 150 }), { qos: 1 })
+    await client.publishAsync(configTopic, cfg({ memoryPercent: '70' }), { qos: 1 })
+    await client.publishAsync(configTopic, 'not json', { qos: 1 })
+    const alert = await waitFor(() => memoryAlert(msgs))
+    expect(alert.payload.threshold).toBe(90)
+    await new Promise(r => setTimeout(r, 300))
+    expect(msgs.filter(m => m.payload?.kind === 'memory')).toHaveLength(1)
+  })
+
+  it('uses its environment thresholds when no config was received', async () => {
+    const broker = await startBroker(); cleanup.push(() => broker.stop())
+    const { client, msgs } = await observe(broker.url); cleanup.push(() => client.endAsync())
+    const thresholds = { ...DEFAULT_THRESHOLDS, memoryPercent: 95 }
+    const agent = startAgent(config(broker.url, { thresholds }), async () => reading({ memUsed: 96 })); cleanup.push(() => agent.stop())
+    const alert = await waitFor(() => memoryAlert(msgs))
+    expect(alert.payload.threshold).toBe(95)
+  })
+})

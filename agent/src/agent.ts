@@ -1,7 +1,7 @@
 import mqtt from 'mqtt'
 import { collectReading } from './collector'
 import { logDebug, logError, logInfo } from './log'
-import { decodePayload, parseCheckRequest, topic, type MessageType, type Reading } from './protocol'
+import { decodePayload, parseCheckRequest, parseThresholds, topic, type MessageType, type Reading } from './protocol'
 import { createBoundedQueue } from './queue'
 import { createThresholdEvaluator, type Thresholds } from './thresholds'
 
@@ -26,6 +26,7 @@ export function startAgent(cfg: AgentConfig, collect: () => Promise<Reading> = (
   const queue = createBoundedQueue<Outgoing>(cfg.queueLimit)
   const statusTopic = topic(cfg.hostId, 'status')
   const checkTopic = topic(cfg.hostId, 'check')
+  const configTopic = topic(cfg.hostId, 'config')
   const offline = JSON.stringify({ state: 'offline' })
 
   const client = mqtt.connect(cfg.mqttUrl, {
@@ -79,12 +80,19 @@ export function startAgent(cfg: AgentConfig, collect: () => Promise<Reading> = (
   client.on('connect', () => {
     logInfo('connected to broker', { hostId: cfg.hostId, queued: queue.size })
     client.publish(statusTopic, JSON.stringify({ state: 'online' }), { qos: 1, retain: true })
-    client.subscribe(checkTopic, { qos: 1 }, (err) => { if (err) logError('subscribe failed', { topic: checkTopic, error: errMsg(err) }) })
+    client.subscribe([checkTopic, configTopic], { qos: 1 }, (err) => { if (err) logError('subscribe failed', { topics: [checkTopic, configTopic], error: errMsg(err) }) })
     for (const m of queue.drain()) client.publish(m.topic, m.payload, { qos: 1 })
   })
   client.on('error', err => logError('mqtt error', { hostId: cfg.hostId, error: errMsg(err) }))
   client.on('close', () => logDebug('mqtt connection closed', { hostId: cfg.hostId }))
   client.on('message', (t, payload) => {
+    if (t === configTopic) {
+      const thresholds = parseThresholds(decodePayload(payload))
+      if (!thresholds) { logError('invalid threshold config', { hostId: cfg.hostId, payload: payload.toString().slice(0, 200) }); return }
+      evaluate.setThresholds(thresholds)
+      logInfo('thresholds updated', { hostId: cfg.hostId, ...thresholds })
+      return
+    }
     if (t !== checkTopic) return
     const req = parseCheckRequest(decodePayload(payload))
     if (!req) { logError('invalid check request', { hostId: cfg.hostId, payload: payload.toString().slice(0, 200) }); return }
