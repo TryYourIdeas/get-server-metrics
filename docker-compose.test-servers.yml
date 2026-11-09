@@ -119,6 +119,7 @@ services:
       dockerfile: docker/test-servers/Dockerfile
       args: { BASE_IMAGE: "debian:12-slim", NODE_IMAGE: "node:22-bookworm-slim", PKG_MANAGER: apt }
     environment: { <<: *agent-env, HOST_ID: test-alert, DISK_THRESHOLD_PERCENT: "1" }
-
+  
+  
 volumes:
   testdata:
