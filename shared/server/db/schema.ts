@@ -40,3 +40,23 @@ export const hosts = pgTable('hosts', {
   online: boolean('online').notNull().default(false),
   lastSeen: timestamp('last_seen', { withTimezone: true }).notNull().defaultNow()
 })
+
+/** The fleet-wide threshold set. A single row (id 1); no row means the built-in defaults apply. */
+export const thresholdDefaults = pgTable('threshold_defaults', {
+  id: integer('id').primaryKey().default(1),
+  cpuPercent: real('cpu_percent').notNull(),
+  cpuConsecutive: integer('cpu_consecutive').notNull(),
+  memoryPercent: real('memory_percent').notNull(),
+  diskPercent: real('disk_percent').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})
+
+/** Per-host overrides: a null column means "use the default for this value". No foreign key to hosts on purpose. */
+export const hostThresholds = pgTable('host_thresholds', {
+  hostId: text('host_id').primaryKey(),
+  cpuPercent: real('cpu_percent'),
+  cpuConsecutive: integer('cpu_consecutive'),
+  memoryPercent: real('memory_percent'),
+  diskPercent: real('disk_percent'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})

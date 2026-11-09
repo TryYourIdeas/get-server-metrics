@@ -1,12 +1,14 @@
 import { and, asc, desc, eq, gte, lt, type SQL } from 'drizzle-orm'
-import type { DiskReading, Reading, UsageEvent } from 'agent/protocol'
+import { THRESHOLD_KEYS, type DiskReading, type Reading, type Thresholds, type UsageEvent } from 'agent/protocol'
 import type { Db } from '../db'
-import { diskSamples, events, hosts, samples } from '../db/schema'
+import { diskSamples, events, hosts, hostThresholds, samples, thresholdDefaults } from '../db/schema'
 import { logDebug } from './log'
 import { RANGE_MS, type HistoryRange } from './range'
 
 export type HistoryPoint = Reading
 export interface HostRow { hostId: string; online: boolean; lastSeen: string }
+export interface ThresholdSettings { defaults: Thresholds | null; overrides: Record<string, Partial<Thresholds>> }
+export interface OverviewEntry extends HostRow { current: Reading | null; events: UsageEvent[] }
 
 export function createRepository(db: Db) {
   const selectPoints = (where: SQL | undefined) => db.select({
@@ -71,6 +73,55 @@ export function createRepository(db: Db) {
     async listHosts(): Promise<HostRow[]> {
       const rows = await db.select().from(hosts).orderBy(asc(hosts.hostId))
       return rows.map(h => ({ hostId: h.hostId, online: h.online, lastSeen: h.lastSeen.toISOString() }))
+    },
+
+    async getThresholdSettings(): Promise<ThresholdSettings> {
+      const [defaults] = await db.select().from(thresholdDefaults).limit(1)
+      const rows = await db.select().from(hostThresholds)
+      const overrides: Record<string, Partial<Thresholds>> = {}
+      for (const row of rows) {
+        const o: Partial<Thresholds> = {}
+        for (const key of THRESHOLD_KEYS) if (row[key] !== null) o[key] = row[key]
+        overrides[row.hostId] = o
+      }
+      return {
+        defaults: defaults
+          ? { cpuPercent: defaults.cpuPercent, cpuConsecutive: defaults.cpuConsecutive, memoryPercent: defaults.memoryPercent, diskPercent: defaults.diskPercent }
+          : null,
+        overrides
+      }
+    },
+
+    async saveDefaultThresholds(t: Thresholds): Promise<void> {
+      const values = { ...t, updatedAt: new Date() }
+      await db.insert(thresholdDefaults).values({ id: 1, ...values }).onConflictDoUpdate({ target: thresholdDefaults.id, set: values })
+      logDebug('default thresholds saved', { ...t })
+    },
+
+    /** Replaces the host's override: values missing from `o` go back to "use the default". */
+    async saveHostThresholds(hostId: string, o: Partial<Thresholds>): Promise<void> {
+      const values = {
+        cpuPercent: o.cpuPercent ?? null, cpuConsecutive: o.cpuConsecutive ?? null,
+        memoryPercent: o.memoryPercent ?? null, diskPercent: o.diskPercent ?? null, updatedAt: new Date()
+      }
+      await db.insert(hostThresholds).values({ hostId, ...values }).onConflictDoUpdate({ target: hostThresholds.hostId, set: values })
+      logDebug('host thresholds saved', { hostId, ...o })
+    },
+
+    async deleteHostThresholds(hostId: string): Promise<boolean> {
+      const deleted = await db.delete(hostThresholds).where(eq(hostThresholds.hostId, hostId)).returning({ hostId: hostThresholds.hostId })
+      logDebug('host thresholds deleted', { hostId, existed: deleted.length > 0 })
+      return deleted.length > 0
+    },
+
+    /** Every host with its latest reading and recent events (newest first), for the all-servers view. */
+    async getOverview(eventsPerHost = 50): Promise<OverviewEntry[]> {
+      const rows = await db.select().from(hosts).orderBy(asc(hosts.hostId))
+      return Promise.all(rows.map(async h => ({
+        hostId: h.hostId, online: h.online, lastSeen: h.lastSeen.toISOString(),
+        current: await this.getLatest(h.hostId),
+        events: await this.getRecentEvents(h.hostId, eventsPerHost)
+      })))
     },
 
     async getHistory(hostId: string, range: HistoryRange, now: Date = new Date()): Promise<HistoryPoint[]> {
