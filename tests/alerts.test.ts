@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeAlerts, describeAlert, isStale } from '../dashboard/app/utils/alerts'
+import { activeAlerts, alertsForView, describeAlert, isStale } from '../dashboard/app/utils/alerts'
 
 const e = (kind: 'cpu' | 'memory' | 'disk', state: 'alert' | 'ok', ts: string, mount?: string) =>
   ({ kind, state, value: 95, threshold: 90, ts, ...(mount ? { mount } : {}) })
@@ -37,5 +37,17 @@ describe('describeAlert', () => {
     expect(describeAlert(e('cpu', 'alert', 't'))).toBe('CPU at 95% (threshold 90%)')
     expect(describeAlert(e('memory', 'alert', 't'))).toBe('Memory at 95% (threshold 90%)')
     expect(describeAlert(e('disk', 'alert', 't', '/data'))).toBe('Disk /data at 95% (threshold 90%)')
+  })
+})
+
+describe('alertsForView', () => {
+  const open = [e('memory', 'alert', '2026-01-01T11:59:00Z')]
+
+  it('returns the open alerts of the machine being viewed', () => {
+    expect(alertsForView('web-01', open)).toEqual(activeAlerts(open))
+  })
+
+  it('returns none in the all-servers view, even if the last viewed machine had an open alert', () => {
+    expect(alertsForView(undefined, open)).toEqual([])
   })
 })

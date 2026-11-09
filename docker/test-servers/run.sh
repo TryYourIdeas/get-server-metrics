@@ -108,6 +108,44 @@ verify() {
         if grep -q "\"$h\"" <<<"$hosts_json"; then echo "ok    dashboard lists $h"; else echo "FAIL  dashboard does not list $h"; failed=1; fi
       done
     fi
+
+    echo "Checking threshold changes..."
+    wait_for() { # <sql returning a count> <seconds>: true once the count is at least 1
+      local end=$((SECONDS + $2)) n
+      while [ "$SECONDS" -lt "$end" ]; do
+        n=$(psql_q "$1" 2>/dev/null || echo 0)
+        [ "${n:-0}" -ge 1 ] && return 0
+        sleep 2
+      done
+      return 1
+    }
+    api="http://localhost:$DASHBOARD_PORT/api/hosts/test-debian12/thresholds"
+    json=(-H 'content-type: application/json')
+    # 1. Lowering test-debian12's disk threshold to 1% through the dashboard makes its running agent raise an alert.
+    if curl -fsS -X PUT "${json[@]}" -d '{"diskPercent":1}' "$api" >/dev/null 2>&1 \
+       && wait_for "select count(*) from events where host_id = 'test-debian12' and kind = 'disk' and state = 'alert'" 30; then
+      echo "ok    lowering test-debian12's disk threshold raised an alert"
+    else echo "FAIL  test-debian12 did not raise a disk alert after its threshold was lowered"; failed=1; fi
+    # 2. Removing the override sends the default back and the alert recovers.
+    if curl -fsS -X DELETE "$api" >/dev/null 2>&1 \
+       && wait_for "select count(*) from events where host_id = 'test-debian12' and kind = 'disk' and state = 'ok'" 30; then
+      echo "ok    removing the override recovered the alert"
+    else echo "FAIL  test-debian12's disk alert did not recover after the override was removed"; failed=1; fi
+    cfg() { "${compose[@]}" exec -T mosquitto mosquitto_sub -h localhost -u app -P "$APP_PASSWORD" -t 'computer-usage/+/config' -v -W 3 2>/dev/null || true; }
+    if cfg | grep -q '^computer-usage/test-debian12/config .*"diskPercent":90'; then
+      echo "ok    the retained config for test-debian12 holds the default again"
+    else echo "FAIL  the retained config for test-debian12 is missing or stale"; failed=1; fi
+    # 3. An agent must not be able to write config topics (its own or another host's).
+    forged='{"cpuPercent":5,"cpuConsecutive":3,"memoryPercent":90,"diskPercent":90}'
+    for t in computer-usage/test-alpine/config computer-usage/test-debian12/config; do
+      "${compose[@]}" exec -T mosquitto mosquitto_pub -h localhost -u test-alpine -P "$TEST_AGENT_PASSWORD" -t "$t" -r -m "$forged" >/dev/null 2>&1 || true
+    done
+    if cfg | grep -q '"cpuPercent":5[,}]'; then
+      echo "FAIL  an agent was able to publish a config message (check docker/mosquitto/acl)"; failed=1
+      for t in computer-usage/test-alpine/config computer-usage/test-debian12/config; do
+        "${compose[@]}" exec -T mosquitto mosquitto_pub -h localhost -u app -P "$APP_PASSWORD" -t "$t" -r -n >/dev/null 2>&1 || true
+      done
+    else echo "ok    agents cannot publish config messages"; fi
   fi
 
   if [ "$failed" -ne 0 ]; then echo "Logs: ${compose[*]} logs <service>"; exit 1; fi
@@ -118,7 +156,7 @@ down() {
   # Remove the data the test agents stored, so the dashboard does not keep showing dead test hosts.
   # (Postgres may not be running; then there is nothing to clean.)
   "${compose[@]}" exec -T postgres psql -U postgres -d computer-usage -c \
-    "delete from samples where host_id like 'test-%'; delete from events where host_id like 'test-%'; delete from hosts where host_id like 'test-%';" \
+    "delete from samples where host_id like 'test-%'; delete from events where host_id like 'test-%'; delete from hosts where host_id like 'test-%'; delete from host_thresholds where host_id like 'test-%';" \
     >/dev/null 2>&1 || echo "note: could not clean test data from the database (is Postgres running?)"
   "${compose[@]}" --profile apps rm -sf "${SERVICES[@]}"
   # Compose names the volume <project>_testdata, and the project defaults to this folder's name.

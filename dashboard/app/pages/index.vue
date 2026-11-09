@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import type { Reading, UsageEvent } from 'agent/protocol'
+import type { OverviewEntry } from '../../../shared/server/utils/repository'
+import type { BusMessage } from '~/utils/overview'
 
 type HostInfo = { hostId: string; online: boolean; lastSeen: string }
 type HostsResponse = { hosts: HostInfo[]; brokerConnected: boolean; staleAfterMs: number }
-type BusMessage =
-  | { type: 'reading'; host: string; reading: Reading; requestId?: string; stored: boolean }
-  | { type: 'event'; host: string; event: UsageEvent }
-  | { type: 'status'; host: string; online: boolean }
-  | { type: 'broker'; connected: boolean }
-  | { type: 'ping' }
+
+/** The machine selector value that shows every machine at once. */
+const ALL = '__all__'
 
 const MAX_LIVE_POINTS = 720
 const CHECK_TIMEOUT_MS = 10_000
@@ -16,14 +15,28 @@ const MAX_EVENTS = 50
 
 const range = ref<'1h' | '24h' | '7d'>('1h')
 const { data: hostsData, refresh: refreshHosts } = await useFetch<HostsResponse>('/api/hosts')
-const host = ref<string | undefined>(hostsData.value?.hosts[0]?.hostId)
-const { data: current, error: currentError, refresh: refreshCurrent } = await useFetch<Reading | null>('/api/metrics/current', { query: { host } })
-const { data: history, refresh: refreshHistory } = await useFetch<Reading[]>('/api/metrics/history', { query: { range, host } })
-const { data: events, refresh: refreshEvents } = await useFetch<UsageEvent[]>('/api/events', { query: { host } })
+const view = ref<string>(ALL)
+/** The machine shown in the detail view; undefined while "All servers" is selected. */
+const host = computed(() => (view.value === ALL ? undefined : view.value))
+// The detail data is only fetched for a real machine, so nothing is requested while "All servers" is shown.
+const detailFetch = { watch: false, immediate: !!host.value } as const
+const { data: current, error: currentError, refresh: refreshCurrent } = await useFetch<Reading | null>('/api/metrics/current', { query: { host }, ...detailFetch })
+const { data: history, refresh: refreshHistory } = await useFetch<Reading[]>('/api/metrics/history', { query: { range, host }, ...detailFetch })
+const { data: events, refresh: refreshEvents } = await useFetch<UsageEvent[]>('/api/events', { query: { host }, ...detailFetch })
+const { data: overviewData, refresh: refreshOverview } = await useFetch<{ entries: OverviewEntry[] }>('/api/overview')
+const overview = ref<OverviewEntry[]>(overviewData.value?.entries ?? [])
+watch(overviewData, (v) => { overview.value = v?.entries ?? [] })
 
 // Points received over the stream, merged after the stored history so charts move between database re-syncs.
 const live = ref<Reading[]>([])
 watch([range, host], () => { live.value = [] })
+watch(host, (h) => {
+  // Messages about the previous machine must not follow the user to another view.
+  checkMessage.value = ''
+  logsMessage.value = ''
+  if (h) void Promise.all([refreshCurrent(), refreshHistory(), refreshEvents()])
+})
+watch(range, () => { if (host.value) void refreshHistory() })
 
 const brokerConnected = ref(hostsData.value?.brokerConnected ?? false)
 const streamUp = ref(true)
@@ -45,7 +58,8 @@ const hostStatus = computed(() => {
   if (stale.value) return 'no recent data'
   return selectedHost.value.online ? 'online' : 'offline'
 })
-const alerts = computed(() => activeAlerts(events.value ?? []))
+const alerts = computed(() => alertsForView(host.value, events.value ?? []))
+const sortedOverview = computed(() => sortEntries(overview.value, now.value, hostsData.value?.staleAfterMs ?? 600_000))
 
 function finishCheck(message = '') {
   clearTimeout(checkTimer)
@@ -99,9 +113,11 @@ function onMessage(raw: MessageEvent) {
   try { msg = JSON.parse(raw.data) } catch { return }
   if (msg.type === 'ping') return
   if (msg.type === 'broker') { brokerConnected.value = msg.connected; return }
+  const nextOverview = applyStreamMessage(overview.value, msg, new Date().toISOString())
+  if (nextOverview !== overview.value) overview.value = nextOverview
+  else void refreshOverview() // a machine the overview does not know yet
   if (msg.type === 'status') { void refreshHosts(); return }
   touchHostLocally(msg.host, true)
-  if (!host.value) host.value = msg.host
   if (msg.host !== host.value) return
   if (msg.type === 'reading') {
     current.value = msg.reading
@@ -120,7 +136,9 @@ onMounted(() => {
   source.onopen = () => {
     streamUp.value = true
     // After a reconnect, re-sync everything that may have changed while the stream was down.
-    if (opened) void Promise.all([refreshHosts(), refreshCurrent(), refreshHistory(), refreshEvents()])
+    if (opened) {
+      void Promise.all([refreshHosts(), refreshOverview(), ...(host.value ? [refreshCurrent(), refreshHistory(), refreshEvents()] : [])])
+    }
     opened = true
   }
   source.onerror = () => { streamUp.value = false }
@@ -143,10 +161,12 @@ const when = (ts: string) => new Date(ts).toLocaleString()
     <header class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-bold">Computer usage</h1>
       <div class="flex items-center gap-2">
-        <select v-if="hostsData?.hosts.length" v-model="host" class="rounded border border-slate-300 bg-white px-2 py-1 text-sm" aria-label="Machine">
+        <select v-if="hostsData?.hosts.length" v-model="view" class="rounded border border-slate-300 bg-white px-2 py-1 text-sm" aria-label="Machine">
+          <option :value="ALL">All servers</option>
           <option v-for="h in hostsData.hosts" :key="h.hostId" :value="h.hostId">{{ h.hostId }}</option>
         </select>
         <span v-if="hostStatus" class="text-sm" :class="hostStatus === 'online' ? 'text-emerald-700' : 'text-amber-700'">{{ hostStatus }}</span>
+        <NuxtLink to="/triggers" class="rounded border border-slate-300 bg-white px-3 py-1 text-sm">Triggers</NuxtLink>
         <button class="rounded bg-sky-600 px-3 py-1 text-sm text-white disabled:opacity-50" :disabled="!host || checking || !brokerConnected" @click="checkNow">
           {{ checking ? 'Checking…' : 'Check now' }}
         </button>
@@ -164,6 +184,22 @@ const when = (ts: string) => new Date(ts).toLocaleString()
       <p v-for="a in alerts" :key="a.kind + (a.mount ?? '')" class="font-medium">{{ describeAlert(a) }}</p>
     </div>
 
+    <template v-if="view === ALL">
+      <p v-if="!overview.length" class="rounded border border-slate-200 bg-white p-4 text-slate-600">
+        No machines have reported yet. Start an agent (see the manual); the first reading appears within a few minutes.
+      </p>
+      <section v-else class="grid gap-4 sm:grid-cols-2" aria-label="All servers">
+        <ServerCard
+          v-for="e in sortedOverview"
+          :key="e.hostId"
+          :entry="e"
+          :state="cardState(e, now, hostsData?.staleAfterMs ?? 600_000)"
+          @select="view = $event"
+        />
+      </section>
+    </template>
+
+    <template v-else>
     <p v-if="currentError" class="rounded bg-red-50 p-3 text-red-700">Could not read system metrics.</p>
     <p v-else-if="!host" class="rounded border border-slate-200 bg-white p-4 text-slate-600">
       No machines have reported yet. Start an agent (see the manual); the first reading appears within a few minutes.
@@ -196,5 +232,6 @@ const when = (ts: string) => new Date(ts).toLocaleString()
         </li>
       </ul>
     </section>
+    </template>
   </main>
 </template>

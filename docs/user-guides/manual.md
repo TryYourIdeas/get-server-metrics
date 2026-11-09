@@ -21,6 +21,7 @@
 
 ## Reading the dashboard
 
+0. The first entry of the machine picker, **All servers** (the default), shows one card per machine: status, live CPU/memory/disk gauges and open alerts. Alerting machines are listed first, then offline ones. Click a card to open that machine.
 1. Use the machine picker to choose a host. The label next to it shows `online`, `offline` (the agent stopped or lost its connection) or `no recent data` (nothing received for twice the heartbeat interval).
 2. The top panel shows the host's latest CPU, memory and one gauge per disk. Colours turn amber at 70% and red at 90%.
 3. Use the **1h / 24h / 7d** buttons to change the history charts. Each chart has 0/50/100% gridlines (with real sizes for memory and disk) and shows the current reading in its title.
@@ -29,6 +30,30 @@
 6. A red banner lists alerts that are still open (CPU, memory or a disk crossing its threshold). It clears when the agent reports recovery. **Recent events** lists the latest alerts and recoveries.
 7. Amber banners mean the event monitor lost the MQTT broker, or the browser lost its live connection (it reconnects by itself and re-syncs).
 8. **Delete server logs** removes all stored samples (including disk readings) and events for the selected machine only. Confirm the prompt to proceed. Its machine entry remains, and future readings are stored as usual.
+
+## Changing the alert triggers
+
+1. Click **Triggers** in the dashboard header.
+2. Under **Default thresholds** enter CPU %, CPU checks in a row, Memory % and Disk % (percentages 1–100, checks a whole number ≥ 1) and click **Save defaults**. These apply to every machine without its own value.
+3. Under **Machines** click **Edit** next to a machine to give it its own values. Leave a field blank to use the default (the default is shown in the field). Values that differ from the default are highlighted. **Use defaults** removes all of a machine's own values.
+4. Running agents receive the change within seconds without restarting; an agent that is offline receives it when it reconnects. If a metric is already alerting, no duplicate alert is raised; it recovers when it falls below the new threshold.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser (Triggers page)
+  participant V as Nuxt dashboard
+  participant E as Event monitor
+  participant DB as Postgres
+  participant M as Mosquitto
+  participant A as Agent
+  B->>V: PUT /api/thresholds or /api/hosts/:host/thresholds
+  V->>E: forward the request
+  E->>E: validate (400 with a message if invalid)
+  E->>DB: save defaults / override
+  E->>M: publish effective values, retained, to computer-usage/<host>/config
+  M->>A: config (immediately, or when the agent reconnects)
+  A->>A: validate and apply, keeping alert state
+```
 
 ## Querying the stored data
 

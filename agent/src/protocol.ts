@@ -1,7 +1,7 @@
 /** Wire protocol shared by the agent and the app. Must stay dependency-free: the Nuxt app imports it directly. */
 
 export const TOPIC_ROOT = 'computer-usage'
-export const MESSAGE_TYPES = ['heartbeat', 'event', 'check', 'reading', 'status'] as const
+export const MESSAGE_TYPES = ['heartbeat', 'event', 'check', 'reading', 'status', 'config'] as const
 export type MessageType = typeof MESSAGE_TYPES[number]
 
 export interface DiskReading { mount: string; used: number; total: number }
@@ -11,6 +11,17 @@ export interface UsageEvent { kind: EventKind; state: 'alert' | 'ok'; value: num
 export interface CheckRequest { requestId: string }
 export interface CheckReply extends Reading { requestId: string }
 export interface StatusMessage { state: 'online' | 'offline' }
+
+export interface Thresholds { cpuPercent: number; cpuConsecutive: number; memoryPercent: number; diskPercent: number }
+export const DEFAULT_THRESHOLDS: Thresholds = { cpuPercent: 90, cpuConsecutive: 3, memoryPercent: 90, diskPercent: 90 }
+export const THRESHOLD_KEYS: readonly (keyof Thresholds)[] = ['cpuPercent', 'cpuConsecutive', 'memoryPercent', 'diskPercent']
+/** The same ranges the agent enforces for its environment variables. */
+export const THRESHOLD_LIMITS: Record<keyof Thresholds, { min: number; max?: number; integer: boolean }> = {
+  cpuPercent: { min: 1, max: 100, integer: false },
+  cpuConsecutive: { min: 1, integer: true },
+  memoryPercent: { min: 1, max: 100, integer: false },
+  diskPercent: { min: 1, max: 100, integer: false }
+}
 
 const HOST_ID = /^[A-Za-z0-9_.-]{1,64}$/
 const MAX_DISKS = 64
@@ -85,4 +96,44 @@ export function parseCheckReply(v: unknown): CheckReply | null {
 export function parseStatus(v: unknown): StatusMessage | null {
   if (!isObj(v) || (v.state !== 'online' && v.state !== 'offline')) return null
   return { state: v.state }
+}
+
+export function isValidThreshold(key: keyof Thresholds, v: unknown): v is number {
+  const { min, max, integer } = THRESHOLD_LIMITS[key]
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < min) return false
+  if (max !== undefined && v > max) return false
+  return integer ? Number.isSafeInteger(v) : true
+}
+
+/** A complete threshold set (all four values valid). Extra keys are ignored. */
+export function parseThresholds(v: unknown): Thresholds | null {
+  if (!isObj(v)) return null
+  const out: Partial<Thresholds> = {}
+  for (const key of THRESHOLD_KEYS) {
+    const value = v[key]
+    if (!isValidThreshold(key, value)) return null
+    out[key] = value
+  }
+  return out as Thresholds
+}
+
+/** A non-empty subset of the four values, each valid; unknown keys are rejected. */
+export function parseThresholdOverride(v: unknown): Partial<Thresholds> | null {
+  if (!isObj(v)) return null
+  const keys = Object.keys(v)
+  if (keys.length === 0) return null
+  const out: Partial<Thresholds> = {}
+  for (const key of keys) {
+    if (!(THRESHOLD_KEYS as readonly string[]).includes(key)) return null
+    const k = key as keyof Thresholds
+    const value = v[k]
+    if (!isValidThreshold(k, value)) return null
+    out[k] = value
+  }
+  return out
+}
+
+/** The values a host actually uses: its override where it has one, the defaults everywhere else. */
+export function resolveThresholds(defaults: Thresholds, override?: Partial<Thresholds> | null): Thresholds {
+  return { ...defaults, ...(override ?? {}) }
 }
