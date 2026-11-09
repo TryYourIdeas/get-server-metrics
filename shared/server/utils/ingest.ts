@@ -12,7 +12,13 @@ const preview = (p: Uint8Array | string) => (typeof p === 'string' ? p : new Tex
  * Handles one MQTT message. Validation problems are logged and dropped (the promise resolves);
  * database errors reject so the caller can retry.
  */
-export function createIngest({ repo, bus, now = () => new Date() }: { repo: Repo; bus: Bus; now?: () => Date }) {
+export function createIngest({ repo, bus, now = () => new Date(), onHostOnline }: {
+  repo: Repo
+  bus: Bus
+  now?: () => Date
+  /** Called after a host reports `online`; failures are logged and never fail the message. */
+  onHostOnline?: (host: string) => Promise<void> | void
+}) {
   const reject = (reason: string, topic: string, payload: Uint8Array | string) => {
     logError('mqtt message rejected', { reason, topic, payload: preview(payload) })
   }
@@ -57,6 +63,9 @@ export function createIngest({ repo, bus, now = () => new Date() }: { repo: Repo
         const online = status.state === 'online'
         await repo.touchHost(host, { online }, now())
         bus.emit({ type: 'status', host, online })
+        if (online && onHostOnline) {
+          try { await onHostOnline(host) } catch (err) { logError('onHostOnline failed', { host, error: err instanceof Error ? err.message : String(err) }) }
+        }
         return
       }
       default:

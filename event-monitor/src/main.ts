@@ -1,6 +1,6 @@
 import mqtt from 'mqtt'
-import { isValidHostId, TOPIC_ROOT, topic } from 'agent/protocol'
-import { createServer, type ServerResponse } from 'node:http'
+import { isValidHostId, parseThresholdOverride, parseThresholds, resolveThresholds, DEFAULT_THRESHOLDS, TOPIC_ROOT, topic } from 'agent/protocol'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createDb } from '../../shared/server/db'
 import { runMigrations } from '../../shared/server/db/migrate'
 import { bus } from '../../shared/server/utils/bus'
@@ -8,6 +8,7 @@ import { createCheckRequester } from '../../shared/server/utils/check'
 import { createIngest } from '../../shared/server/utils/ingest'
 import { logDebug, logError, logInfo } from '../../shared/server/utils/log'
 import { createRepository } from '../../shared/server/utils/repository'
+import { createThresholdPublisher } from '../../shared/server/utils/threshold-publisher'
 import { createPruner, parseRetentionDays, PRUNE_INTERVAL_MS } from '../../shared/server/utils/retention'
 import { withRetry } from '../../shared/server/utils/retry'
 import { readMqttConfig } from './mqtt-config'
@@ -17,6 +18,21 @@ const errorMessage = (err: unknown) => (err instanceof Error ? err.message : Str
 const json = (res: ServerResponse, status: number, value: unknown) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
   res.end(JSON.stringify(value))
+}
+
+const MAX_BODY_BYTES = 4096
+class BodyError extends Error { constructor(readonly status: number, message: string) { super(message) } }
+
+/** Reads a small JSON body; throws a BodyError (413 too large, 400 not JSON) the route turns into a response. */
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length
+    if (size > MAX_BODY_BYTES) throw new BodyError(413, 'request body too large')
+    chunks.push(chunk as Buffer)
+  }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { throw new BodyError(400, 'body must be valid JSON') }
 }
 
 async function main() {
@@ -48,7 +64,6 @@ async function main() {
   })
   void prune()
   const pruneTimer = setInterval(() => { void prune() }, PRUNE_INTERVAL_MS)
-  const ingest = createIngest({ repo, bus })
   let brokerConnected = false
 
   const client = mqtt.connect(cfg.url, {
@@ -58,6 +73,17 @@ async function main() {
     username: cfg.username,
     password: cfg.password
   })
+  const publisher = createThresholdPublisher({
+    repo,
+    publish: async (host, thresholds) => {
+      await client.publishAsync(topic(host, 'config'), JSON.stringify(thresholds), { qos: 1, retain: true })
+    }
+  })
+  const ingest = createIngest({ repo, bus, onHostOnline: publisher.onHostOnline })
+  /** Publishing is best effort after the change is saved; a failure is logged and the next change or reconnect retries. */
+  const publishInBackground = (what: string, fn: () => Promise<void>) => {
+    void fn().catch(err => logError('publishing thresholds failed', { what, error: errorMessage(err) }))
+  }
   const requestCheck = createCheckRequester({
     publish: async (host, requestId) => {
       await client.publishAsync(topic(host, 'check'), JSON.stringify({ requestId }), { qos: 1 })
@@ -126,6 +152,39 @@ async function main() {
         if (!result.ok) return json(res, 429, { error: 'Check requested too recently' })
         logDebug('check requested', { host, requestId: result.requestId })
         return json(res, 200, { requestId: result.requestId })
+      }
+
+      try {
+        if (req.method === 'PUT' && url.pathname === '/thresholds') {
+          const defaults = parseThresholds(await readJson(req))
+          if (!defaults) return json(res, 400, { error: 'cpuPercent, memoryPercent and diskPercent must be numbers from 1 to 100, and cpuConsecutive a whole number of 1 or more' })
+          await repo.saveDefaultThresholds(defaults)
+          logInfo('default thresholds changed', { ...defaults })
+          publishInBackground('all hosts', () => publisher.publishAll())
+          return json(res, 200, { defaults })
+        }
+
+        const thresholdsMatch = url.pathname.match(/^\/hosts\/([^/]+)\/thresholds$/)
+        if (thresholdsMatch && (req.method === 'PUT' || req.method === 'DELETE')) {
+          let host: string
+          try { host = decodeURIComponent(thresholdsMatch[1]!) } catch { return json(res, 400, { error: 'invalid host id' }) }
+          if (!isValidHostId(host)) return json(res, 400, { error: 'invalid host id' })
+          let override: ReturnType<typeof parseThresholdOverride> = null
+          if (req.method === 'PUT') {
+            override = parseThresholdOverride(await readJson(req))
+            if (!override) return json(res, 400, { error: 'send at least one of cpuPercent, cpuConsecutive, memoryPercent, diskPercent with a valid value' })
+            await repo.saveHostThresholds(host, override)
+          }
+          const deleted = req.method === 'DELETE' ? await repo.deleteHostThresholds(host) : undefined
+          logInfo('host thresholds changed', { host, override: override ?? null, deleted })
+          publishInBackground(host, () => publisher.publishHost(host))
+          const settings = await repo.getThresholdSettings()
+          const effective = resolveThresholds(settings.defaults ?? DEFAULT_THRESHOLDS, settings.overrides[host])
+          return json(res, 200, req.method === 'PUT' ? { override, effective } : { deleted, effective })
+        }
+      } catch (err) {
+        if (err instanceof BodyError) return json(res, err.status, { error: err.message })
+        throw err
       }
 
       const logsMatch = url.pathname.match(/^\/hosts\/([^/]+)\/logs$/)

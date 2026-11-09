@@ -89,3 +89,27 @@ describe('topics', () => {
     expect(repo.touchHost).not.toHaveBeenCalled()
   })
 })
+
+describe('onHostOnline hook', () => {
+  const withHook = (onHostOnline: (host: string) => unknown) => {
+    const bus = createBus()
+    return createIngest({ repo, bus, now, onHostOnline })
+  }
+
+  it('calls onHostOnline when a host reports online', async () => {
+    const onHostOnline = vi.fn()
+    await withHook(onHostOnline)('computer-usage/web-01/status', JSON.stringify({ state: 'online' }))
+    expect(onHostOnline).toHaveBeenCalledWith('web-01')
+  })
+
+  it('does not call it for an offline status', async () => {
+    const onHostOnline = vi.fn()
+    await withHook(onHostOnline)('computer-usage/web-01/status', JSON.stringify({ state: 'offline' }))
+    expect(onHostOnline).not.toHaveBeenCalled()
+  })
+
+  it('a failing onHostOnline does not make ingest reject', async () => {
+    const failing = withHook(() => Promise.reject(new Error('publish failed')))
+    await expect(failing('computer-usage/web-01/status', JSON.stringify({ state: 'online' }))).resolves.toBeUndefined()
+  })
+})
