@@ -1,7 +1,7 @@
-import type { EventKind, Reading, UsageEvent } from './protocol'
+import type { EventKind, Reading, Thresholds, UsageEvent } from './protocol'
 
-export interface Thresholds { cpuPercent: number; cpuConsecutive: number; memoryPercent: number; diskPercent: number }
-export const DEFAULT_THRESHOLDS: Thresholds = { cpuPercent: 90, cpuConsecutive: 3, memoryPercent: 90, diskPercent: 90 }
+export { DEFAULT_THRESHOLDS } from './protocol'
+export type { Thresholds } from './protocol'
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 const pct = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0)
