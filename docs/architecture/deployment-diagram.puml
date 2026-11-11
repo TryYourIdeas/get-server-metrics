@@ -1,0 +1,62 @@
+@startuml DeploymentDiagram
+
+title Server Resources - Deployment View
+
+skinparam backgroundColor white
+skinparam shadowing false
+
+skinparam node {
+    BackgroundColor #F8F9FA
+    BorderColor #495057
+}
+
+skinparam database {
+    BackgroundColor #FFF3BF
+    BorderColor #E67700
+}
+
+node "Application Server A" as HostA {
+    artifact "Event Producer"
+}
+
+node "Application Server B" as HostB {
+    artifact "Event Producer"
+}
+
+node "Application Server C" as HostC {
+    artifact "Event Producer"
+}
+
+node "Messaging Server" as MQHost {
+    artifact "Mosquitto"
+}
+
+node "Monitoring Server" as MonHost {
+
+    artifact "Event Monitor Service"
+
+}
+
+node "Database Server" as DBHost {
+
+    database "Events DB"
+
+}
+
+node "Dashboard Server" as DashHost {
+
+    artifact "Dashboard Web App"
+
+}
+
+HostA --> MQHost : MQTT
+HostB --> MQHost : MQTT
+HostC --> MQHost : MQTT
+
+MQHost --> MonHost : Event Stream
+
+MonHost --> DBHost : SQL
+
+DBHost --> DashHost : Queries
+
+@enduml

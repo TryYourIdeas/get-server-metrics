@@ -1,0 +1,51 @@
+@startuml ComponentDiagram
+
+title Server Resources - Component View
+
+skinparam backgroundColor white
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+skinparam component {
+    BackgroundColor #F8F9FA
+    BorderColor #495057
+    FontColor #212529
+}
+
+skinparam database {
+    BackgroundColor #FFF3BF
+    BorderColor #E67700
+}
+
+skinparam queue {
+    BackgroundColor #D0EBFF
+    BorderColor #1971C2
+}
+
+package "Data Sources" {
+
+    component "Server A" as S1
+    component "Server B" as S2
+    component "Server C" as S3
+
+}
+
+queue "Mosquitto\nMQTT Broker" as MQTT
+
+component "Event Monitor" as MON
+
+database "Events Database" as DB
+
+component "Dashboard" as DASH
+
+S1 --> MQTT : Publish Events
+S2 --> MQTT : Publish Events
+S3 --> MQTT : Publish Events
+
+MQTT --> MON : MQTT Topics
+
+MON --> DB : Store Events
+
+DB --> DASH : Read Metrics\nand Events
+
+@enduml
